@@ -17,26 +17,31 @@ Six roles (SIH team size). Each person owns folders, reviews PRs there, and star
 - [ ] **Measure-on-receipt mode** (no quantum memory): the verifier measures on arrival in a random basis and later checks only the positions where the bases match. See `qds/keys.py`.
 - [ ] Port `bell_correlators` to `QiskitAerBackend`.
 - [ ] Add amplitude-damping noise through QuTiP or Aer density-matrix (the `.[noise]` extra).
-- [ ] With Security: an `entangle_and_measure` channel model in the Stim backend.
+- [x] With Security: an `entangle_and_measure` channel model in the Stim backend.
 - [ ] Early: run **one real IBM teleportation job** and save the result for the pitch. Batch it; the Open plan gives about 10 min/month.
 
 ## Detection Lead
-- [ ] **Per-basis QBER fingerprint** in D4: a likelihood-ratio test that tells "Eve measures in Z only" apart from depolarising noise. This is attack attribution without ML.
-- [ ] Channel-level rolling window for D3 (CHSH) and CUSUM across verifications.
-- [ ] `notebooks/01_calibration.ipynb`: empirical forgery/FRR rates over 10⁵ trials against the Chernoff bounds (the D5 deliverable: within ±10%).
-- [ ] SPRT early stop: report how many quantum rounds are saved per rejection.
+- [x] **Per-basis QBER fingerprint** in D4 (`detect/fingerprint.py`): Pauli-channel tomography plus a G-test against the frozen baseline, with attack attribution and no ML.
+- [x] Channel-level rolling window for D3 (CHSH) and CUSUM across verifications (`detect/channel_monitor.py`).
+- [x] Exact binomial bounds next to Chernoff, plus a simulator Monte-Carlo check (`detect/validate.py`; 0.9% error, D5 needs ≤ 10%).
+- [x] SPRT early stop: `rounds_saved_by_sprt` in the D4 output.
+- [x] Honeypot keys in D6.
+- [ ] `notebooks/01_calibration.ipynb`: plots from `detect/validate.py` for the report.
 
 ## Security Lead
-- [ ] Implement the `entangle_and_measure` attack (collective attack).
-- [ ] Strength sweep: detection rate vs adversary strength, 0–100%, for each attack (for the D7 report).
-- [ ] Add OAuth 2.1 / API keys and RBAC to the FastAPI routes.
-- [ ] ML-KEM-768 key exchange helper in `qsentinel/pqc/`.
-- [ ] Add semgrep to CI.
+- [x] `entangle_and_measure` attack, plus the information-vs-disturbance meter.
+- [x] New attacks: `stealth_probe`, `key_reuse_forgery`, `stolen_key_honeypot`, `repudiation(_unprotected)`.
+- [x] Strength sweep CLI: `python -m qsentinel.attacks.sweep <attack>` (CSV for the D7 report).
+- [x] API-key RBAC on the FastAPI routes (identity comes from the key, not the request body).
+- [x] Hybrid X25519 + ML-KEM-768 KEM and an ML-DSA-authenticated AEAD channel (`pqc/kem.py`, `pqc/channel.py`).
+- [x] semgrep in CI (advisory).
+- [ ] Carry the teleportation correction bits over `SecureChannel` in the node-to-node transport.
+- [ ] OAuth 2.1 / mTLS in front of the API; API keys in Vault.
 
 ## Blockchain Lead
-- [ ] Merkle-batch anchoring (one root per N verdicts).
-- [ ] Rebuild the `NonceRegistry` from the ledger at startup (a nonce is consumed once, network-wide).
-- [ ] **Commit-reveal symmetrisation** between verifiers, then the `repudiation` attack plus its detector (transferability).
+- [x] Merkle-batch anchoring with RFC 6962-style inclusion proofs (`ledger/merkle.py`).
+- [x] Rebuild the `NonceRegistry` from the ledger at startup (`ledger/audit.py`).
+- [x] **Commit-reveal symmetrisation** (`ledger/commit_reveal.py`, `qds/symmetrise.py`), the `repudiation` attack, and the ledger dispute auditor.
 - [ ] Phase 3: a 4-node Fabric network in `chain/` with Go chaincode (see `chain/README.md`).
 
 ## Frontend Lead

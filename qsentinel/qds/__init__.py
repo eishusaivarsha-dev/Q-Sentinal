@@ -14,8 +14,10 @@ from .protocol import (
     sign,
     verify,
 )
+from .symmetrise import symmetrise
 
 __all__ = [
     "KeyAlreadyUsedError", "PrivateKey", "PublicKeyHandle", "Signature",
-    "VerificationTranscript", "distribute", "keygen", "message_digest", "sign", "verify",
+    "VerificationTranscript", "distribute", "keygen", "message_digest", "sign", "symmetrise",
+    "verify",
 ]

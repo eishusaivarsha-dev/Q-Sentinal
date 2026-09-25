@@ -49,10 +49,14 @@ Optional extras: `pip install -e ".[qiskit]"` (Aer cross-check), `.[noise]` (QuT
 - The honest signature always verifies: 0 mismatches across 65,536 rounds, with CHSH S = 2.828.
 - Intercept-resend gives QBER ≈ 0.333 (six-state) / 0.25 (two-basis), and CHSH falls below 2.
 - Full-size verification (L=256, n=256, 65k rounds) takes about 30 ms on the Stim backend.
-- The attack campaign catches all of these: blind forgery, partial forgery, intercept-resend (100% and 25–50%), replay, MITM message swap, impersonation, and unauthorised verification.
-- Not yet implemented: entangle-and-measure, repudiation, measure-on-receipt mode, Fabric, and IBM hardware. See [docs/roles.md](docs/roles.md).
+- The attack campaign passes 17/17: forgeries, intercept-resend, entangle-and-measure, stealth probes, replay, key reuse, MITM, repudiation, impersonation, unauthorised verification, and stolen keystore (via a honeypot).
+- The Pauli fingerprint catches a 3% single-basis probe at QBER 1% (far below the 11% threshold), and estimates its size as 3.1%.
+- With symmetrisation, transferability holds in 100% of trials at every tampering level. Without it, the ledger audit flags every split.
+- The forgery bound, validated through the simulator, is within 0.9% of the exact formula.
+- Not yet implemented: measure-on-receipt mode, Fabric, and IBM hardware. See [docs/roles.md](docs/roles.md).
 
 ## Docs
 - [docs/architecture.md](docs/architecture.md): the six layers and the one-way telemetry rule
 - [docs/protocol.md](docs/protocol.md): the protocol, the security bounds and the n-vs-noise trade-off
+- [docs/detection-security-blockchain.md](docs/detection-security-blockchain.md): detectors, attacks, post-quantum channel and ledger, with how to run each
 - [docs/roadmap.md](docs/roadmap.md): phases P0–P5 and which tools come in when

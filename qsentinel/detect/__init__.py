@@ -7,8 +7,9 @@ Rules for this package:
 """
 
 from .base import DetectionContext, DetectorResult, Severity
+from .channel_monitor import ChannelMonitor, link_id
 from .engine import Verdict, evaluate
 from .registry import IdentityRegistry, NonceRegistry
 
-__all__ = ["DetectionContext", "DetectorResult", "IdentityRegistry", "NonceRegistry",
-           "Severity", "Verdict", "evaluate"]
+__all__ = ["ChannelMonitor", "DetectionContext", "DetectorResult", "IdentityRegistry",
+           "NonceRegistry", "Severity", "Verdict", "evaluate", "link_id"]

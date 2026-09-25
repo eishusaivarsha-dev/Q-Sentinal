@@ -14,12 +14,21 @@ class ChannelModel:
 
     depolarizing:       honest channel noise (prob. of a random Pauli error)
     intercept_fraction: fraction of pairs an eavesdropper measures and resends (attack)
-    eve_bases:          bases the eavesdropper picks from (0=Z, 1=X, 2=Y)
+    eve_bases:          bases the intercepting eavesdropper picks from (0=Z, 1=X, 2=Y)
+    entangle_fraction:  fraction of pairs Eve probes with an ancilla (CNOT) and measures later
+                        (entangle-and-measure / collective attack)
+    entangle_basis:     basis Eve's ancilla probe copies (0=Z, 1=X, 2=Y)
     """
 
     depolarizing: float = 0.0
     intercept_fraction: float = 0.0
     eve_bases: tuple[int, ...] = (0, 1, 2)
+    entangle_fraction: float = 0.0
+    entangle_basis: int = 0
+
+    def honest_part(self) -> ChannelModel:
+        """Only the natural noise - what the link looked like during trusted commissioning."""
+        return ChannelModel(depolarizing=self.depolarizing)
 
 
 @dataclass
@@ -27,6 +36,8 @@ class RoundResult:
     outcomes: np.ndarray                 # (n,) verifier measurement bits
     bsm: np.ndarray                      # (n, 2) signer Bell-state-measurement bits (m0, m1)
     attacked: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=bool))
+    eve_bases: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.int8))     # -1 = none
+    eve_outcomes: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.int8))  # -1 = none
 
 
 class QuantumBackend(Protocol):

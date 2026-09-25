@@ -20,8 +20,13 @@ jobs:
         run: ruff check .
       - name: "Guard: no AI/ML in the trust path (NFR-1)"
         run: lint-imports
-      - name: SAST
+      - name: SAST (bandit)
         run: bandit -q -r qsentinel -ll
+      - name: SAST (semgrep)
+        run: pip install semgrep && semgrep scan --config p/python --error --quiet qsentinel
+        continue-on-error: true   # advisory until the first clean baseline is triaged
+      - name: "Bound validation: simulator vs exact formula (D5, within 10%)"
+        run: python -m qsentinel.detect.validate --n 16 --blocks 40000
       - name: Tests
         run: pytest --cov=qsentinel --cov-report=term-missing
       - name: Attack suite (every attack must be detected)

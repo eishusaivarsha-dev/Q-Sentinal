@@ -31,8 +31,11 @@ Data flows **up** only. Nothing in L5 can call or modify L0–L2. This is enforc
 | ID | Watches | Rule | Catches |
 |---|---|---|---|
 | D1 | determinism | mismatches == 0 (info) | baseline integrity |
-| D2 | per-block mismatches | any block > ⌊τn⌋ | forgery, MITM message swap |
-| D3 | CHSH S, fidelity F (sacrificial pairs) | S ≤ 2 critical, F < 0.9 warning | entanglement tampering |
-| D4 | QBER, Wald SPRT, χ² on BSM | QBER > 11% or SPRT = attack | intercept-resend |
-| D5 | nonce, counter, timestamp | reused / non-monotonic / stale | replay |
-| D6 | key↔signer, key↔verifier, RBAC | any binding mismatch | impersonation, unauthorised verification |
+| D2 | per-block mismatches | any block > ⌊τn⌋ (τ_transfer if forwarded) | forgery, MITM message swap, key reuse |
+| D3 | CHSH S, fidelity F (sacrificial pairs) | S ≤ 2 critical; S drop vs baseline or pooled F < 0.9 warning | entanglement tampering |
+| D4 | QBER, SPRT, **Pauli fingerprint**, **CUSUM**, χ² on BSM | QBER > 11% or SPRT critical; fingerprint drift / CUSUM warning | intercept-resend, entangle-and-measure, **stealth probes** |
+| D5 | nonce, one-time key, counter, timestamp (per verifier) | reused / non-monotonic / stale | replay, key reuse |
+| D6 | key↔signer, key↔verifier, RBAC, **honeypots** | any binding mismatch / honeypot used | impersonation, unauthorised verification, **stolen keystore** |
+| Audit | ledger (`ledger/audit.py`) | strict ACCEPT vs lenient REJECT on the same signature | **repudiation / equivocation** |
+
+Detection, cybersecurity and blockchain details: [detection-security-blockchain.md](detection-security-blockchain.md).

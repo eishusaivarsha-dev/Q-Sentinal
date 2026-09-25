@@ -17,6 +17,8 @@ dependencies = [
     "stim>=1.13",
     "pyyaml>=6.0",
     "dilithium-py>=1.1",        # pure-Python ML-DSA (dev); liboqs-python used if installed
+    "kyber-py>=1.0",            # pure-Python ML-KEM (dev); liboqs-python used if installed
+    "cryptography>=42",         # X25519, HKDF-SHA3, ChaCha20-Poly1305
     "fastapi>=0.110",
     "uvicorn[standard]>=0.29",
     "pydantic>=2.6",
@@ -53,8 +55,11 @@ target-version = "py311"
 select = ["E", "F", "I", "B", "UP"]
 
 [tool.ruff.lint.flake8-bugbear]
-# ChannelModel is a frozen dataclass, so it is safe as a default argument.
-extend-immutable-calls = ["qsentinel.quantum.ChannelModel", "qsentinel.quantum.backend.ChannelModel"]
+# ChannelModel is a frozen dataclass; FastAPI dependency markers are meant to be defaults.
+extend-immutable-calls = [
+    "qsentinel.quantum.ChannelModel", "qsentinel.quantum.backend.ChannelModel",
+    "fastapi.Depends", "fastapi.Header", "fastapi.Query", "qsentinel.api.main.require",
+]
 
 # ---------------------------------------------------------------------------
 # Architectural guard: NO AI/ML IN THE TRUST PATH (NFR-1)

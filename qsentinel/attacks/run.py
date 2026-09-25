@@ -23,8 +23,9 @@ def run_campaign(path: str | Path) -> list:
     reports = []
     for i, run in enumerate(spec["runs"]):
         env = QSentinel(settings=settings)   # fresh state per run
+        strength = run.get("strength")
         try:
-            rep = run_attack(env, run["attack"], float(run.get("strength", 1.0)),
+            rep = run_attack(env, run["attack"], None if strength is None else float(strength),
                              seed=base_seed + i, channel=ChannelModel(**run.get("channel", {})))
         except NotImplementedError:
             print(f"  SKIP  {run['attack']} (not implemented yet)")
@@ -36,7 +37,7 @@ def run_campaign(path: str | Path) -> list:
 def main(argv: list[str]) -> int:
     path = argv[1] if len(argv) > 1 else Path(__file__).parent / "campaigns" / "smoke.yaml"
     reports = run_campaign(path)
-    fmt = "{result:5} {attack:30} {strength:>5} {decision:7} fired={fired:12} expected={expected:8} {detail}"
+    fmt = "{result:5} {attack:28} {strength:>5} {decision:7} fired={fired:14} expected={expected:9} {detail}"
     for r in reports:
         print(fmt.format(**r.row()))
     failed = [r for r in reports if not r.passed]

@@ -27,6 +27,9 @@ class Verdict:
     def alerts(self) -> list[DetectorResult]:
         return [r for r in self.results if r.alert and r.severity != Severity.INFO]
 
+    def result(self, detector: str) -> DetectorResult:
+        return next(r for r in self.results if r.detector == detector)
+
     def to_dict(self) -> dict:
         return {"decision": self.decision, "results": [r.to_dict() for r in self.results],
                 "certificate": self.certificate}
@@ -34,10 +37,17 @@ class Verdict:
 
 def evaluate(ctx: DetectionContext) -> Verdict:
     results = [d.run(ctx) for d in DETECTORS]
+    by_id = {r.detector: r for r in results}
     reject = any(r.alert and r.severity == Severity.CRITICAL for r in results)
     decision = "REJECT" if reject else "ACCEPT"
-    if decision == "ACCEPT":   # consume nonce only for accepted signatures
-        ctx.nonces.commit(ctx.signature.signer_id, ctx.signature.nonce.hex(), ctx.signature.counter)
+    sig = ctx.signature
+    if decision == "ACCEPT":   # consume nonce + one-time key only for accepted signatures
+        ctx.nonces.commit(signer_id=sig.signer_id, verifier_id=ctx.pubkey.verifier_id,
+                          nonce_hex=sig.nonce.hex(), counter=sig.counter, key_id=sig.key_id)
+    if ctx.monitor is not None and not by_id["D2"].alert:
+        # Only honest-looking transcripts describe the CHANNEL (a forger's mismatches do not).
+        d4 = by_id["D4"].extra
+        ctx.monitor.record(ctx.link, ctx.bell, ctx.bell_pairs, d4["cusum"], d4["cusum_alarm"])
     return Verdict(decision, results, _certificate(ctx, decision, results))
 
 
@@ -45,15 +55,20 @@ def _certificate(ctx: DetectionContext, decision: str, results: list[DetectorRes
     """Proof-carrying verdict: everything a regulator needs to re-derive the decision."""
     p = ctx.settings.protocol
     d2 = next(r for r in results if r.detector == "D2")
+    d4 = next(r for r in results if r.detector == "D4")
     body = {
         "decision": decision,
         "issued_at": time.time(),
         "protocol": {"basis_set": p.basis_set, "hash_bits": p.hash_bits,
-                     "rounds_per_bit": p.rounds_per_bit, "tau": p.tau},
+                     "rounds_per_bit": p.rounds_per_bit, "tau_applied": d2.extra["tau"],
+                     "transferred": ctx.transferred},
         "transcript": ctx.transcript.summary(),
         "signature": {"signer_id": ctx.signature.signer_id, "key_id": ctx.signature.key_id,
                       "nonce": ctx.signature.nonce.hex(), "counter": ctx.signature.counter},
+        "link": ctx.link,
         "forgery_bound_per_block": d2.extra["forgery_bound_per_block"],
+        "forgery_exact_per_block": d2.extra["forgery_exact_per_block"],
+        "channel_fingerprint": d4.extra["fingerprint"]["label"],
         "alerts": [f"{r.detector}: {r.detail}" for r in results
                    if r.alert and r.severity != Severity.INFO],
         "ai_in_trust_path": False,
