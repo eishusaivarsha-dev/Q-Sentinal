@@ -54,6 +54,6 @@ Six roles (SIH team size). Each person owns folders, reviews PRs there, and star
 ## Team Lead
 - [ ] Fill in names above and uncomment `.github/CODEOWNERS`.
 - [ ] Protect `main`: require PRs and CI. (On a free personal account, branch protection or rulesets need a **public** repo or GitHub Pro/Team.)
-- [ ] Redis Streams telemetry bus with a read-only ACL for `ops/`.
+- [ ] Redis Streams telemetry bus with a read-only ACL for `ops/`. (Streams mirror in `qsentinel/telemetry.py` done by Shubham Kumar; ACL user still open.)
 - [ ] Demo script (under 6 min): honest → forgery → intercept slider → replay → ledger check.
 - [ ] A pre-recorded backup video of the demo.

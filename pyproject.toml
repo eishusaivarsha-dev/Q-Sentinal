@@ -29,6 +29,7 @@ qiskit = ["qiskit>=2.0", "qiskit-aer>=0.15"]
 ibm = ["qiskit>=2.0", "qiskit-ibm-runtime>=0.30"]
 noise = ["qutip>=5.0"]
 pqc = ["liboqs-python>=0.10"]
+redis = ["redis>=5.0"]              # optional Redis Streams telemetry mirror (QSENTINEL_REDIS_URL)
 dev = [
     "pytest>=8",
     "pytest-cov>=5",
