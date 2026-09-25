@@ -12,6 +12,9 @@ Lifecycle of one key:
 from __future__ import annotations
 
 import secrets
+import threading
+import time
+from collections import OrderedDict, deque
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -48,12 +51,46 @@ class QSentinel:
     _pubkeys: dict[tuple[str, str], PublicKeyHandle] = field(default_factory=dict)
     _keystore: dict[str, PrivateKey] = field(default_factory=dict)       # signer's key store
     _sym_shares: dict[str, dict[str, tuple[bytes, bytes]]] = field(default_factory=dict)
+    # Read side for the API / dashboard (never consulted by the detectors):
+    max_verdicts: int = 2000
+    _verdicts: OrderedDict = field(default_factory=OrderedDict)     # ledger_index -> verdict dict
+    _link_history: dict = field(default_factory=dict)               # link -> deque of points
+    _lock: threading.RLock = field(default_factory=threading.RLock)
 
     def __post_init__(self):
         if self.monitor is None:
             self.monitor = ChannelMonitor(window=self.settings.detectors.bell_window)
         if self.ledger.entries:   # restart: replay protection is rebuilt from the ledger
             self.nonces = rebuild_freshness(self.ledger)
+        self.ledger.listeners.append(self._on_ledger_entry)
+
+    def _on_ledger_entry(self, entry) -> None:
+        summary = {k: entry.payload[k] for k in ("decision", "key_id", "verifier_id", "link", "root")
+                   if k in entry.payload}
+        self.telemetry.publish("ledger_entry", {"index": entry.index, "kind": entry.kind,
+                                                "entry_hash": entry.entry_hash, **summary})
+
+    # --- read side (API) -----------------------------------------------------------------
+    def verdict(self, ledger_index: int) -> dict | None:
+        return self._verdicts.get(ledger_index)
+
+    def recent_verdicts(self, limit: int = 50) -> list[dict]:
+        out = []
+        for idx in reversed(self._verdicts):
+            v = self._verdicts[idx]
+            c = v["certificate"]
+            out.append({"ledger_index": idx, "decision": v["decision"], "issued_at": c["issued_at"],
+                        "link": c["link"], "verifier_id": c["transcript"]["verifier_id"],
+                        "signer_id": c["signature"]["signer_id"], "key_id": c["signature"]["key_id"],
+                        "transferred": c["protocol"]["transferred"],
+                        "alerts": [{k: r[k] for k in ("detector", "severity", "detail")}
+                                   for r in v["results"] if r["alert"] and r["severity"] != "info"]})
+            if len(out) >= limit:
+                break
+        return out
+
+    def link_history(self, link: str) -> list[dict]:
+        return list(self._link_history.get(link, ()))
 
     # --- enrolment -----------------------------------------------------------------------
     def register_signer(self, signer_id: str) -> None:
@@ -88,6 +125,10 @@ class QSentinel:
     def issue_key(self, signer_id: str, seed: int | None = None, symmetrise_copies: bool | None = None,
                   honeypot: bool = False) -> PrivateKey:
         """Fresh one-time key, teleported to every authorised verifier (then symmetrised)."""
+        with self._lock:
+            return self._issue_key(signer_id, seed, symmetrise_copies, honeypot)
+
+    def _issue_key(self, signer_id, seed, symmetrise_copies, honeypot) -> PrivateKey:
         if signer_id not in self.signers:
             raise PermissionError(f"unknown signer {signer_id!r}")
         priv = keygen(signer_id, self.settings.protocol, seed)
@@ -134,8 +175,9 @@ class QSentinel:
         return self.sign_with(self.issue_key(signer_id, seed), message)
 
     def sign_with(self, priv: PrivateKey, message: bytes) -> Signature:
-        self._counters[priv.signer_id] = self._counters.get(priv.signer_id, -1) + 1
-        return sign(priv, message, self._counters[priv.signer_id])
+        with self._lock:
+            self._counters[priv.signer_id] = self._counters.get(priv.signer_id, -1) + 1
+            return sign(priv, message, self._counters[priv.signer_id])
 
     # --- verifier side -------------------------------------------------------------------
     def public_key(self, key_id: str, verifier_id: str) -> PublicKeyHandle:
@@ -151,6 +193,10 @@ class QSentinel:
 
     def verify(self, sig: Signature, verifier_id: str, channel: ChannelModel = ChannelModel(),
                seed: int | None = None, transferred: bool = False) -> Verdict:
+        with self._lock:
+            return self._verify(sig, verifier_id, channel, seed, transferred)
+
+    def _verify(self, sig, verifier_id, channel, seed, transferred) -> Verdict:
         seed = secrets.randbits(62) if seed is None else seed
         pub = self.public_key(sig.key_id, verifier_id)
         owner = self.identities.key_owner.get(sig.key_id, sig.signer_id)
@@ -178,11 +224,21 @@ class QSentinel:
         verdict.certificate["ledger_index"] = entry.index
         verdict.certificate["ledger_entry_hash"] = entry.entry_hash
         verdict.certificate["merkle_proof"] = self.ledger.inclusion_proof(entry.index) or "pending"
+        self._verdicts[entry.index] = verdict.to_dict()
+        while len(self._verdicts) > self.max_verdicts:
+            self._verdicts.popitem(last=False)
+        d3, d4 = verdict.result("D3").extra, verdict.result("D4").extra
+        fp = d4["fingerprint"]
+        point = {"ts": time.time(), "ledger_index": entry.index, "decision": verdict.decision,
+                 "qber": transcript.qber, "chsh": d3.get("chsh"), "fidelity": d3.get("fidelity"),
+                 "rates": fp["rates"], "baseline_rates": fp["baseline_rates"], "pauli": fp["pauli"],
+                 "excess_pauli": fp["excess_pauli"], "fingerprint_drift": fp["drift"],
+                 "fingerprint": fp["label"], "est_intercept_fraction": fp["est_intercept_fraction"],
+                 "cusum": d4["cusum"], "cusum_alarm": d4["cusum_alarm"], "sprt_rounds": d4["sprt_rounds"]}
+        self._link_history.setdefault(link, deque(maxlen=200)).append(point)
         self.telemetry.publish("verdict", {
-            "decision": verdict.decision, "verifier_id": verifier_id, "key_id": sig.key_id,
-            "link": link, "transferred": transferred, "qber": transcript.qber,
-            "chsh": verdict.result("D3").extra.get("chsh"),
-            "fingerprint": verdict.result("D4").extra["fingerprint"]["label"],
+            **point, "verifier_id": verifier_id, "signer_id": sig.signer_id, "key_id": sig.key_id,
+            "link": link, "transferred": transferred,
             "alerts": [r.to_dict() for r in verdict.alerts],
         })
         return verdict

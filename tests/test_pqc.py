@@ -1,6 +1,26 @@
+import itertools
+
 import pytest
 
 from qsentinel.pqc import ChannelError, MLDSASigner, SecureChannel, connect, kem
+from qsentinel.pqc.signer import IMPLS, _available
+
+AVAILABLE = [i for i in IMPLS if _available(i)]
+
+
+@pytest.mark.parametrize("signer_impl,verifier_impl", list(itertools.product(AVAILABLE, AVAILABLE)))
+def test_mldsa_implementations_interoperate(signer_impl, verifier_impl):
+    """Every FIPS 204 implementation must verify every other's signatures (and reject tampering)."""
+    s = MLDSASigner(implementation=signer_impl)
+    v = MLDSASigner(public_key=s.public_key, implementation=verifier_impl)
+    sig = s.sign(b"ledger entry")
+    assert v.verify(b"ledger entry", sig)
+    assert not v.verify(b"ledger entrY", sig)
+
+
+def test_fast_native_implementation_is_preferred_when_present():
+    if "openssl" in AVAILABLE:
+        assert MLDSASigner().implementation == "openssl"
 
 
 @pytest.fixture(scope="module")

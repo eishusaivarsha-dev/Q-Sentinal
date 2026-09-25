@@ -8,8 +8,9 @@ Combiner: HKDF-SHA3-256 over (ss_mlkem || ss_x25519), bound to both ciphertexts 
 public keys, so an attacker cannot mix and match components. It follows the concatenation
 approach of the IETF hybrid-design draft; it is NOT a byte-compatible X-Wing implementation.
 
-ML-KEM backend: liboqs-python if installed (`.[pqc]`), else pure-Python `kyber-py`
-(fine for dev/demo, NOT constant-time).
+ML-KEM backend, in order: native ML-KEM from `cryptography` (OpenSSL 3.5+/4.x, constant-time),
+liboqs-python (`.[pqc]`), then pure-Python `kyber-py` (fine for dev/demo, NOT constant-time).
+All are FIPS 203 and interoperate.
 """
 
 from __future__ import annotations
@@ -25,6 +26,28 @@ INFO = b"QSENTINEL-hybrid-kem-v1"
 
 
 def _mlkem():
+    try:
+        from cryptography.hazmat.primitives.asymmetric import mlkem
+        mlkem.MLKEM768PrivateKey.generate()
+
+        class _Native:
+            name = "openssl"
+
+            @staticmethod
+            def keygen():
+                dk = mlkem.MLKEM768PrivateKey.generate()
+                return dk.public_key().public_bytes_raw(), dk
+
+            @staticmethod
+            def encaps(ek):
+                return mlkem.MLKEM768PublicKey.from_public_bytes(ek).encapsulate()   # (ss, ct)
+
+            @staticmethod
+            def decaps(dk, ct):
+                return dk.decapsulate(ct)
+        return _Native
+    except Exception:  # ImportError or UnsupportedAlgorithm on an older OpenSSL
+        pass
     try:
         import oqs
 

@@ -7,7 +7,7 @@ on:
 
 jobs:
   core:
-    name: Trust kernel (lint, AI-free guard, tests, attack suite)
+    name: Backend (lint, AI-free guard, tests, attack suite)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,20 +15,20 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-      - run: pip install -e ".[dev,qiskit]"
+      - run: pip install -e ".[dev,qiskit,redis]" && pip install -e ops
       - name: Lint
         run: ruff check .
       - name: "Guard: no AI/ML in the trust path (NFR-1)"
         run: lint-imports
       - name: SAST (bandit)
-        run: bandit -q -r qsentinel -ll
+        run: bandit -q -r qsentinel ops/qsentinel_ops -ll
       - name: SAST (semgrep)
         run: pip install semgrep && semgrep scan --config p/python --error --quiet qsentinel
         continue-on-error: true   # advisory until the first clean baseline is triaged
+      - name: Tests (core + ops plane)
+        run: pytest --cov=qsentinel --cov-report=term-missing
       - name: "Bound validation: simulator vs exact formula (D5, within 10%)"
         run: python -m qsentinel.detect.validate --n 16 --blocks 40000
-      - name: Tests
-        run: pytest --cov=qsentinel --cov-report=term-missing
       - name: Attack suite (every attack must be detected)
         run: python -m qsentinel.attacks.run qsentinel/attacks/campaigns/smoke.yaml
       - name: Dependency audit
@@ -36,7 +36,7 @@ jobs:
         continue-on-error: true
 
   web:
-    name: SOC dashboard build
+    name: Dashboard (type-check + build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -46,5 +46,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install --no-audit --no-fund
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --no-audit --no-fund
       - run: npm run build

@@ -1,0 +1,6 @@
+# Store and check out text files with LF on every OS (matches .editorconfig; keeps shell scripts
+# runnable on Windows Git Bash and stops line-ending-only diffs).
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.woff2 binary

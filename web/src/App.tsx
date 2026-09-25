@@ -1,47 +1,39 @@
-import { useEffect, useState } from "react";
-import { api, subscribeTelemetry, type AttackRun, type TelemetryEvent } from "./api";
-import AlertFeed from "./components/AlertFeed";
-import AttackPanel from "./components/AttackPanel";
-import BlochSphere from "./components/BlochSphere";
-import ChannelChart from "./components/ChannelChart";
-import VerdictCard from "./components/VerdictCard";
+import { lazy, Suspense } from "react";
+import { Route, Routes } from "react-router-dom";
+import Layout from "./components/Layout";
+import MissionControl from "./pages/MissionControl";
+
+// Pages load on first visit, so the heavy 3-D / chart code stays out of the first download.
+const Journey = lazy(() => import("./pages/Journey"));
+const AttackLab = lazy(() => import("./pages/AttackLab"));
+const VerdictInspector = lazy(() => import("./pages/VerdictInspector"));
+const Channels = lazy(() => import("./pages/Channels"));
+const LedgerExplorer = lazy(() => import("./pages/LedgerExplorer"));
+const Transferability = lazy(() => import("./pages/Transferability"));
+const Bounds = lazy(() => import("./pages/Bounds"));
+const OpsPlane = lazy(() => import("./pages/OpsPlane"));
+const Settings = lazy(() => import("./pages/Settings"));
+
+const page = (el: React.ReactNode) => <Suspense fallback={<p className="text-sm text-slate-500">Loading…</p>}>{el}</Suspense>;
 
 export default function App() {
-  const [health, setHealth] = useState<Record<string, unknown> | null>(null);
-  const [events, setEvents] = useState<TelemetryEvent[]>([]);
-  const [lastRun, setLastRun] = useState<AttackRun | null>(null);
-
-  useEffect(() => {
-    api.health().then(setHealth).catch(() => setHealth(null));
-    return subscribeTelemetry((e) => setEvents((prev) => [...prev.slice(-499), e]));
-  }, []);
-
-  const verdicts = events.filter((e) => e.kind === "verdict");
-
   return (
-    <div className="mx-auto max-w-7xl p-4 md:p-6 space-y-4">
-      <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Q-SENTINEL <span className="text-slate-400 font-normal">SOC console</span>
-        </h1>
-        <p className="text-sm text-slate-400">
-          {health
-            ? `backend ${health.backend} · ${health.basis_set} · L=${health.hash_bits} n=${health.rounds_per_bit} · ${health.pqc}`
-            : "API offline: start it with  uvicorn qsentinel.api.main:app"}
-        </p>
-      </header>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="space-y-4">
-          <AttackPanel onResult={setLastRun} />
-          <BlochSphere />
-        </div>
-        <div className="lg:col-span-2 space-y-4">
-          <ChannelChart verdicts={verdicts} />
-          {lastRun && <VerdictCard run={lastRun} />}
-          <AlertFeed verdicts={verdicts} />
-        </div>
-      </div>
-    </div>
+    <Routes>
+      <Route element={<Layout />}>
+        <Route index element={<MissionControl />} />
+        <Route path="journey" element={page(<Journey />)} />
+        <Route path="journey/:idx" element={page(<Journey />)} />
+        <Route path="attacks" element={page(<AttackLab />)} />
+        <Route path="verdicts" element={page(<VerdictInspector />)} />
+        <Route path="verdicts/:idx" element={page(<VerdictInspector />)} />
+        <Route path="channels" element={page(<Channels />)} />
+        <Route path="ledger" element={page(<LedgerExplorer />)} />
+        <Route path="transferability" element={page(<Transferability />)} />
+        <Route path="bounds" element={page(<Bounds />)} />
+        <Route path="ops" element={page(<OpsPlane />)} />
+        <Route path="settings" element={page(<Settings />)} />
+        <Route path="*" element={<MissionControl />} />
+      </Route>
+    </Routes>
   );
 }
