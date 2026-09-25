@@ -15,7 +15,7 @@ Six roles (SIH team size). Each person owns folders, reviews PRs there, and star
 
 ## Quantum Lead
 - [ ] **Measure-on-receipt mode** (no quantum memory): the verifier measures on arrival in a random basis and later checks only the positions where the bases match. See `qds/keys.py`.
-- [ ] Port `bell_correlators` to `QiskitAerBackend`.
+- [x] Port `bell_correlators` to `QiskitAerBackend` (Shubham Kumar).
 - [ ] Add amplitude-damping noise through QuTiP or Aer density-matrix (the `.[noise]` extra).
 - [x] With Security: an `entangle_and_measure` channel model in the Stim backend.
 - [ ] Early: run **one real IBM teleportation job** and save the result for the pitch. Batch it; the Open plan gives about 10 min/month.
@@ -54,6 +54,6 @@ Six roles (SIH team size). Each person owns folders, reviews PRs there, and star
 ## Team Lead
 - [ ] Fill in names above and uncomment `.github/CODEOWNERS`.
 - [ ] Protect `main`: require PRs and CI. (On a free personal account, branch protection or rulesets need a **public** repo or GitHub Pro/Team.)
-- [ ] Redis Streams telemetry bus with a read-only ACL for `ops/`.
+- [ ] Redis Streams telemetry bus with a read-only ACL for `ops/`. (Streams mirror in `qsentinel/telemetry.py` done by Shubham Kumar; ACL user still open.)
 - [ ] Demo script (under 6 min): honest → forgery → intercept slider → replay → ledger check.
 - [ ] A pre-recorded backup video of the demo.

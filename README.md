@@ -23,7 +23,7 @@ cd web && npm install && npm run dev                     # -> http://localhost:5
 docker compose up --build
 ```
 
-Optional extras: `pip install -e ".[qiskit]"` (Aer cross-check), `.[noise]` (QuTiP), `.[ibm]` (hardware), `.[pqc]` (liboqs).
+Optional extras: `pip install -e ".[qiskit]"` (Aer cross-check), `.[noise]` (QuTiP), `.[ibm]` (hardware), `.[pqc]` (liboqs), `.[redis]` (Redis Streams telemetry mirror).
 
 ## Repository map and owners
 
@@ -53,6 +53,7 @@ Optional extras: `pip install -e ".[qiskit]"` (Aer cross-check), `.[noise]` (QuT
 - The Pauli fingerprint catches a 3% single-basis probe at QBER 1% (far below the 11% threshold), and estimates its size as 3.1%.
 - With symmetrisation, transferability holds in 100% of trials at every tampering level. Without it, the ledger audit flags every split.
 - The forgery bound, validated through the simulator, is within 0.9% of the exact formula.
+- The Qiskit Aer backend now supplies D3's Bell correlators, and a direct CHSH test with rotated (non-Clifford) settings matches the stabilizer-derived S on six channel models (`python -m qsentinel.quantum.chsh_direct`).
 - Not yet implemented: measure-on-receipt mode, Fabric, and IBM hardware. See [docs/roles.md](docs/roles.md).
 
 ## Docs
@@ -62,3 +63,6 @@ Optional extras: `pip install -e ".[qiskit]"` (Aer cross-check), `.[noise]` (QuT
 - [docs/code-walkthrough.md](docs/code-walkthrough.md): file-by-file, function-by-function explanation of the detection, cybersecurity and blockchain code
 - [docs/frontend-spec.md](docs/frontend-spec.md): the Trust Console (dashboard) specification
 - [docs/roadmap.md](docs/roadmap.md): phases P0–P5 and which tools come in when
+
+## Contributors
+See [CONTRIBUTORS.md](CONTRIBUTORS.md).

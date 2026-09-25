@@ -3,6 +3,10 @@
 Uses Aer's stabilizer method so large batched circuits stay tractable. Honest channel noise
 is applied as random Pauli insertions (same model as Stim's DEPOLARIZE1).
 
+`bell_correlators` (D3 input) was contributed by Shubham Kumar. It mirrors the Stim backend's
+template batching: every pair is one of a few tiny circuits (setting x channel noise x Eve
+action), each run once with shots = number of pairs of that type.
+
 TODO(quantum-lead): add Aer density-matrix mode with amplitude damping (non-Pauli noise).
 """
 
@@ -11,6 +15,7 @@ from __future__ import annotations
 import numpy as np
 
 from .backend import ChannelModel, RoundResult
+from .stim_backend import N_ACTIONS, NO_EVE, _eve_choices
 
 
 def _require_qiskit():
@@ -63,6 +68,37 @@ def _channel(qc, q, channel: ChannelModel, rng, eve_creg, eve_i: list[int]) -> b
     return False
 
 
+def _bell_template(QuantumCircuit, setting: int, pauli: int, eve: int):
+    """One Bell pair measured in `setting`, with one channel-noise Pauli and one Eve action.
+
+    q0 = signer's half, q1 = verifier's half (the one in transit), q2 = Eve's ancilla (probe only).
+    `pauli` 0 = none, 1/2/3 = X/Y/Z inserted on q1. `eve` uses the Stim backend's action codes
+    (0-2 intercept-resend in basis Z/X/Y, 3 none, 4-6 ancilla probe in basis Z/X/Y).
+    Classical bits: [eve outcome (intercept only)] a b. Returns (circuit, offset of `a`).
+    """
+    intercept, probe = eve < NO_EVE, eve > NO_EVE
+    qc = QuantumCircuit(3 if probe else 2, 3 if intercept else 2)
+    qc.h(0)
+    qc.cx(0, 1)
+    if pauli:
+        getattr(qc, ("x", "y", "z")[pauli - 1])(1)
+    off = 0
+    if intercept:                        # Eve measures, then re-sends in the original basis
+        _to_z(qc, 1, eve)
+        qc.measure(1, 0)
+        _from_z(qc, 1, eve)
+        off = 1
+    elif probe:                          # Eve copies the basis-b value of q1 into her ancilla
+        _to_z(qc, 1, eve - 4)
+        qc.cx(1, 2)
+        _from_z(qc, 1, eve - 4)
+    _to_z(qc, 0, setting)
+    qc.measure(0, off)
+    _to_z(qc, 1, setting)
+    qc.measure(1, off + 1)
+    return qc, off
+
+
 class QiskitAerBackend:
     name = "qiskit"
 
@@ -103,4 +139,34 @@ class QiskitAerBackend:
                            bsm=np.column_stack([bits("m0"), bits("m1")]), attacked=attacked)
 
     def bell_correlators(self, n_pairs: int, channel: ChannelModel, seed: int) -> dict[str, float]:
-        raise NotImplementedError("TODO(quantum-lead): port StimBackend.bell_correlators to Aer")
+        """Sacrificial Bell pairs -> <ZZ>, <XX>, <YY>, same contract as `StimBackend`.
+
+        Each pair estimates one correlator (its setting is drawn uniformly), and the attack
+        schedule comes from the same sampler as the Stim backend, so for a given seed both
+        backends attack the same pairs and only the quantum simulation differs. Reproducible
+        for a fixed seed on the same Qiskit Aer version.
+        """
+        QuantumCircuit, _, _, AerSimulator = _require_qiskit()
+        rng = np.random.default_rng(seed)
+        eve = _eve_choices(n_pairs, channel, rng)
+        setting = rng.integers(0, 3, size=n_pairs)
+        pauli = np.zeros(n_pairs, dtype=np.int64)        # honest channel noise: random X/Y/Z
+        if channel.depolarizing > 0:
+            hit = rng.random(n_pairs) < channel.depolarizing
+            pauli[hit] = rng.integers(1, 4, size=int(hit.sum()))
+
+        sim = AerSimulator(method="stabilizer")
+        parity = np.zeros(n_pairs, dtype=np.int8)
+        key = (setting * N_ACTIONS + eve) * 4 + pauli
+        for k in np.unique(key):
+            rows = np.flatnonzero(key == k)
+            rest, p = divmod(int(k), 4)
+            s, e = divmod(rest, N_ACTIONS)
+            qc, off = _bell_template(QuantumCircuit, s, p, e)
+            job = sim.run(qc, shots=int(rows.size), memory=True,
+                          seed_simulator=int(rng.integers(2**31 - 1)))
+            # Aer memory strings list the highest-indexed classical bit first.
+            bits = np.array([[int(c) for c in m[::-1]] for m in job.result().get_memory()], dtype=np.uint8)
+            parity[rows] = 1 - 2 * (bits[:, off] ^ bits[:, off + 1])   # +1 if outcomes agree
+        return {name: float(parity[setting == s].mean()) if (setting == s).any() else 0.0
+                for s, name in ((0, "ZZ"), (1, "XX"), (2, "YY"))}
