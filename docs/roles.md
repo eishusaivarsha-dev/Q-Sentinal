@@ -15,7 +15,7 @@ Six roles (SIH team size). Each person owns folders, reviews PRs there, and star
 
 ## Quantum Lead
 - [ ] **Measure-on-receipt mode** (no quantum memory): the verifier measures on arrival in a random basis and later checks only the positions where the bases match. See `qds/keys.py`.
-- [ ] Port `bell_correlators` to `QiskitAerBackend`.
+- [x] Port `bell_correlators` to `QiskitAerBackend` (Shubham Kumar).
 - [ ] Add amplitude-damping noise through QuTiP or Aer density-matrix (the `.[noise]` extra).
 - [x] With Security: an `entangle_and_measure` channel model in the Stim backend.
 - [ ] Early: run **one real IBM teleportation job** and save the result for the pitch. Batch it; the Open plan gives about 10 min/month.
