@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qsentinel-ops"
+version = "0.1.0"
+description = "Q-SENTINEL L5 operations plane - ADVISORY ONLY, outside the trust path"
+requires-python = ">=3.11"
+# Deliberately NOT depending on `qsentinel`: the ops plane talks to the kernel only through the
+# read-only HTTP/telemetry API, so it cannot call or patch detection code.
+dependencies = [
+    "httpx>=0.27",
+    "numpy>=1.26",
+    "scikit-learn>=1.4",
+]
+
+[project.optional-dependencies]
+llm = ["anthropic>=0.40"]
+forecast = ["prophet>=1.1"]
+
+[tool.setuptools.packages.find]
+include = ["qsentinel_ops*"]

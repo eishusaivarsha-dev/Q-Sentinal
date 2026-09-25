@@ -1,0 +1,12 @@
+# Trust-kernel API image. Contains NO ML libraries at all ("separated by dependency", NFR-1).
+FROM python:3.11-slim
+
+WORKDIR /app
+COPY pyproject.toml README.md ./
+COPY qsentinel ./qsentinel
+RUN pip install --no-cache-dir . \
+ && python -c "import importlib.util as u, sys; sys.exit(any(u.find_spec(m) for m in ('sklearn','torch','tensorflow')))"
+
+ENV QSENTINEL_PROFILE=fast
+EXPOSE 8000
+CMD ["uvicorn", "qsentinel.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

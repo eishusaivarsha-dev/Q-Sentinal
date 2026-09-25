@@ -1,0 +1,17 @@
+# Each folder's owner is auto-requested as reviewer on PRs touching it.
+# Replace the placeholders with real GitHub usernames, then uncomment.
+# (Kept commented so GitHub doesn't flag unknown users.)
+
+# *                              @TEAM-LEAD
+# /qsentinel/quantum/            @QUANTUM-LEAD
+# /qsentinel/qds/                @QUANTUM-LEAD
+# /qsentinel/detect/             @DETECTION-LEAD @TEAM-LEAD
+# /qsentinel/attacks/            @SECURITY-LEAD
+# /qsentinel/pqc/                @SECURITY-LEAD
+# /qsentinel/ledger/             @BLOCKCHAIN-LEAD
+# /chain/                        @BLOCKCHAIN-LEAD
+# /web/                          @FRONTEND-LEAD
+# /qsentinel/api/                @TEAM-LEAD
+# /ops/                          @TEAM-LEAD
+# /.github/ /deploy/             @TEAM-LEAD
+# /tests/test_no_ml_in_trust_path.py  @TEAM-LEAD @DETECTION-LEAD

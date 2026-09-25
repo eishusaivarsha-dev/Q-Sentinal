@@ -1,0 +1,19 @@
+# Full-size protocol parameters (L=256, n=256). Used for the security report (D7).
+name: full
+settings: default
+seed: 2026
+runs:
+  - attack: honest
+  - attack: honest
+    channel: {depolarizing: 0.03}
+  - attack: blind_forgery
+  - attack: known_basis_partial_forgery
+    strength: 0.7
+  - attack: intercept_resend
+    strength: 1.0
+  - attack: intercept_resend
+    strength: 0.25
+  - attack: replay
+  - attack: mitm_message_swap
+  - attack: impersonation
+  - attack: unauthorised_verification

@@ -1,0 +1,25 @@
+name: Task
+description: A unit of work for one team member
+labels: ["task"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [quantum, detection, security, blockchain, frontend, backend/devops, docs/pitch]
+    validations: { required: true }
+  - type: textarea
+    id: what
+    attributes:
+      label: What needs to be done
+    validations: { required: true }
+  - type: textarea
+    id: done
+    attributes:
+      label: Definition of done
+      placeholder: "e.g. test X passes, CI green, demo shows Y"
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Phase
+      options: ["P0 Foundation", "P1 Grand Finale", "P2 Hardening", "P3 Trust layer", "P4 Intelligence", "P5 Deployment"]

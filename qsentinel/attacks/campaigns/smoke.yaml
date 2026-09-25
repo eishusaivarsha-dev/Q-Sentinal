@@ -1,0 +1,21 @@
+# Fast campaign run on every CI push. Each run gets seed = seed + index (bit-for-bit reproducible).
+name: smoke
+settings: fast        # fast (L=32, n=64) | default (L=256, n=256)
+seed: 42
+runs:
+  - attack: honest
+  - attack: honest
+    channel: {depolarizing: 0.03}
+  - attack: blind_forgery
+  - attack: known_basis_partial_forgery
+    strength: 0.5
+  - attack: intercept_resend
+    strength: 1.0
+  - attack: intercept_resend
+    strength: 0.5
+  - attack: entangle_and_measure
+  - attack: replay
+  - attack: mitm_message_swap
+  - attack: repudiation
+  - attack: impersonation
+  - attack: unauthorised_verification
