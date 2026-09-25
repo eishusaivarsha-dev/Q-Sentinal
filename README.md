@@ -59,4 +59,6 @@ Optional extras: `pip install -e ".[qiskit]"` (Aer cross-check), `.[noise]` (QuT
 - [docs/architecture.md](docs/architecture.md): the six layers and the one-way telemetry rule
 - [docs/protocol.md](docs/protocol.md): the protocol, the security bounds and the n-vs-noise trade-off
 - [docs/detection-security-blockchain.md](docs/detection-security-blockchain.md): detectors, attacks, post-quantum channel and ledger, with how to run each
+- [docs/code-walkthrough.md](docs/code-walkthrough.md): file-by-file, function-by-function explanation of the detection, cybersecurity and blockchain code
+- [docs/frontend-spec.md](docs/frontend-spec.md): the Trust Console (dashboard) specification
 - [docs/roadmap.md](docs/roadmap.md): phases P0–P5 and which tools come in when
