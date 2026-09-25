@@ -46,6 +46,7 @@ class HashChainLedger:
         self.signer = signer or MLDSASigner()
         self.path = Path(path) if path else None
         self.entries: list[LedgerEntry] = []
+        self.listeners: list = []          # callables(entry), e.g. the pipeline's telemetry hook
         self._lock = threading.RLock()
         if self.path and self.path.exists():
             self.entries = [LedgerEntry(**json.loads(line))
@@ -63,7 +64,9 @@ class HashChainLedger:
             if self.path:
                 with self.path.open("a") as f:
                     f.write(json.dumps(asdict(entry)) + "\n")
-            return entry
+        for listener in self.listeners:
+            listener(entry)
+        return entry
 
     def unanchored_verdicts(self) -> list[int]:
         last = max((e.payload["last"] for e in self.entries if e.kind == "merkle_anchor"), default=-1)

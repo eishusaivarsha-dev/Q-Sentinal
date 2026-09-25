@@ -234,7 +234,8 @@ def _repudiation(env, strength, rng, channel, protect: bool) -> Outcome:
               + ("; ledger audit: DISPUTE flagged" if disputes else "; transferability holds"))
     ok = (not violation) if protect else (not violation or bool(disputes))
     return Outcome(vc, detail, ok=ok, tags=["AUDIT"] if disputes else [],
-                   metrics={"violation": violation, "disputes": len(disputes)})
+                   metrics={"violation": violation, "disputes": len(disputes),
+                            "bob": vb.decision, "charlie": vc.decision, "symmetrised": protect})
 
 
 def repudiation(env, strength, rng, channel):

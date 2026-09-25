@@ -5,6 +5,48 @@ from qsentinel.api.main import app
 client = TestClient(app)
 
 
+def test_verdict_store_overview_and_links_follow_a_verification():
+    sig = client.post("/sign", json={"message": "dashboard"}).json()
+    v = client.post("/verify", json={"signature": sig}).json()
+    idx = v["certificate"]["ledger_index"]
+    assert client.get(f"/verdicts/{idx}").json()["decision"] == v["decision"]
+    assert client.get("/verdicts?limit=5").json()[0]["ledger_index"] == idx
+    assert client.get("/verdicts/999999").status_code == 404
+    ov = client.get("/overview").json()
+    assert ov["verdicts"]["total"] >= 1 and ov["ledger"]["chain_ok"]
+    link = client.get("/links").json()["alice->bob"]
+    assert link["latest"]["ledger_index"] == idx and link["status"] in {"healthy", "warning", "critical"}
+    assert set(link["latest"]["rates"]) == {"Z", "X", "Y"}
+
+
+def test_telemetry_streams_verdicts_and_ledger_entries():
+    kinds = {e["kind"] for e in client.get("/telemetry").json()}
+    assert {"verdict", "ledger_entry", "key_issued"} <= kinds
+    last_verdict = [e for e in client.get("/telemetry").json() if e["kind"] == "verdict"][-1]
+    assert "ledger_index" in last_verdict["data"] and "rates" in last_verdict["data"]
+
+
+def test_single_basis_probe_via_verify_endpoint():
+    sig = client.post("/sign", json={"message": "probe"}).json()
+    channel = {"intercept_fraction": 0.2, "eve_bases": [0]}
+    v = client.post("/verify", json={"signature": sig, "channel": channel}).json()
+    d4 = next(r for r in v["results"] if r["detector"] == "D4")
+    assert "along Z" in d4["extra"]["fingerprint"]["label"]
+    bad = client.post("/verify", json={"signature": sig, "channel": {"eve_bases": [7]}})
+    assert bad.status_code == 422
+
+
+def test_sweep_endpoint_returns_rows():
+    rows = client.post("/sweeps", json={"attack": "intercept_resend", "steps": 3, "trials": 2}).json()
+    assert [r["strength"] for r in rows] == [0.0, 0.5, 1.0]
+    assert rows[0]["reject_rate"] == 0.0 and rows[-1]["reject_rate"] == 1.0
+
+
+def test_repudiation_metrics_expose_both_verifiers():
+    r = client.post("/attacks/run", json={"attack": "repudiation_unprotected", "seed": 2}).json()
+    assert r["metrics"]["bob"] == "ACCEPT" and r["metrics"]["charlie"] == "REJECT"
+
+
 def test_sign_then_verify_roundtrip():
     sig = client.post("/sign", json={"message": "hello"}).json()
     v = client.post("/verify", json={"signature": sig}).json()
