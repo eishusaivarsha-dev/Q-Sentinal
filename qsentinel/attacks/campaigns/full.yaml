@@ -10,10 +10,20 @@ runs:
   - attack: known_basis_partial_forgery
     strength: 0.7
   - attack: intercept_resend
-    strength: 1.0
   - attack: intercept_resend
     strength: 0.25
+  - attack: entangle_and_measure
+  - attack: stealth_probe
+    strength: 0.03
+  - attack: stealth_probe
+    strength: 0.05
+    channel: {depolarizing: 0.03}
   - attack: replay
+  - attack: key_reuse_forgery
   - attack: mitm_message_swap
+  - attack: repudiation
+    strength: 0.12
+  - attack: repudiation_unprotected
   - attack: impersonation
   - attack: unauthorised_verification
+  - attack: stolen_key_honeypot

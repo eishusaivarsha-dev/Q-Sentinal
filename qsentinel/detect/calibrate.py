@@ -1,14 +1,20 @@
 """Closed-form threshold calibration (D5 deliverable). OWNER: Detection Lead.
 
-All bounds are exact Chernoff (KL-divergence) tail bounds for Bernoulli mismatch counts:
+Two families of bounds for Bernoulli mismatch counts, with threshold limit = floor(tau * n):
+
+  Chernoff (KL) tail bounds - simple, monotone, what the pitch quotes:
     P[Bin(n, q) <= tau*n] <= exp(-n * KL(tau || q))   for tau < q   (forger passes)
     P[Bin(n, p) >  tau*n] <= exp(-n * KL(tau || p))   for tau > p   (honest rejected)
+  Exact binomial tails - the true probability under the per-round model (always <= Chernoff).
+
 With tau = 0 the forgery bound reduces to (1 - q)^n, e.g. (3/4)^128 = 1.02e-16.
 """
 
 from __future__ import annotations
 
 import math
+
+from scipy.stats import binom
 
 
 def kl_bernoulli(a: float, p: float) -> float:
@@ -19,19 +25,29 @@ def kl_bernoulli(a: float, p: float) -> float:
 
 
 def forgery_bound(n: int, tau: float, forger_mismatch: float) -> float:
-    """Upper bound on P[an uninformed forger passes one n-round block with threshold tau]."""
+    """Chernoff upper bound on P[an uninformed forger passes one n-round block]."""
     if tau >= forger_mismatch:
         return 1.0
     return math.exp(-n * kl_bernoulli(tau, forger_mismatch))
 
 
+def forgery_exact(n: int, tau: float, forger_mismatch: float) -> float:
+    """Exact P[Bin(n, q) <= floor(tau*n)] - the forger's true pass probability per block."""
+    return float(binom.cdf(math.floor(tau * n), n, forger_mismatch))
+
+
 def honest_rejection_bound(n: int, tau: float, noise: float) -> float:
-    """Upper bound on P[an honest block is rejected] on a channel with QBER `noise`."""
+    """Chernoff upper bound on P[an honest block is rejected] on a channel with QBER `noise`."""
     if noise == 0:
         return 0.0
     if tau <= noise:
         return 1.0
     return math.exp(-n * kl_bernoulli(tau, noise))
+
+
+def honest_rejection_exact(n: int, tau: float, noise: float) -> float:
+    """Exact P[Bin(n, p) > floor(tau*n)]."""
+    return float(binom.sf(math.floor(tau * n), n, noise))
 
 
 def rounds_needed(target: float, tau: float, forger_mismatch: float) -> int:

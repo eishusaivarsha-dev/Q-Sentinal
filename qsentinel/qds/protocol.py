@@ -103,6 +103,7 @@ class VerificationTranscript:
     digest: np.ndarray            # (L,)
     block_mismatches: np.ndarray  # (L,) mismatches per digest-bit block
     mismatch_seq: np.ndarray      # (L*n,) 0/1 in measurement order (for SPRT/CUSUM)
+    meas_bases: np.ndarray        # (L*n,) basis of each round (for the Pauli fingerprint)
     bsm: np.ndarray               # (L*n, 2) signer BSM outcomes
     rounds_per_bit: int
     seed: int
@@ -145,6 +146,7 @@ def verify(sig: Signature, pub: PublicKeyHandle, backend: QuantumBackend,
     mism = (res.outcomes != sig.revealed_values.ravel()).astype(np.uint8)
     return VerificationTranscript(
         key_id=pub.key_id, verifier_id=pub.verifier_id, digest=h,
-        block_mismatches=mism.reshape(L, n).sum(axis=1), mismatch_seq=mism, bsm=res.bsm,
+        block_mismatches=mism.reshape(L, n).sum(axis=1), mismatch_seq=mism,
+        meas_bases=sig.revealed_bases.ravel().copy(), bsm=res.bsm,
         rounds_per_bit=n, seed=seed, backend=backend.name,
     )

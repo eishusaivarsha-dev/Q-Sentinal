@@ -2,10 +2,12 @@
 each entry signed with ML-DSA-65. Only hashes/commitments go on-chain; full transcripts stay
 off-chain (IPFS / Fabric private data in Phase 3).
 
-TODO(blockchain-lead):
-  * Merkle-batch anchoring (one root per N verdicts)
-  * commit-reveal symmetrisation between verifiers (transferability, docs/protocol.md s.6)
-  * rebuild NonceRegistry from ledger on startup
+Merkle anchoring: every `merkle_batch` verdicts, a "merkle_anchor" entry commits the Merkle
+root of their entry hashes. In Phase 3 only these roots need to go to Fabric (or a public
+chain), which is cheap. Every verdict stays provable through an O(log n) inclusion proof.
+
+Entry kinds written by the pipeline:
+  verdict, merkle_anchor, link_commissioned, sym_commit, sym_reveal
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from ..pqc.signer import MLDSASigner
+from .merkle import inclusion_proof, merkle_root, verify_inclusion
 
 GENESIS = "0" * 64
 
@@ -43,11 +46,12 @@ class HashChainLedger:
         self.signer = signer or MLDSASigner()
         self.path = Path(path) if path else None
         self.entries: list[LedgerEntry] = []
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         if self.path and self.path.exists():
             self.entries = [LedgerEntry(**json.loads(line))
                             for line in self.path.read_text().splitlines() if line]
 
+    # --- writing ---------------------------------------------------------------------------
     def append(self, kind: str, payload: dict) -> LedgerEntry:
         with self._lock:
             prev = self.entries[-1].entry_hash if self.entries else GENESIS
@@ -61,6 +65,37 @@ class HashChainLedger:
                     f.write(json.dumps(asdict(entry)) + "\n")
             return entry
 
+    def unanchored_verdicts(self) -> list[int]:
+        last = max((e.payload["last"] for e in self.entries if e.kind == "merkle_anchor"), default=-1)
+        return [e.index for e in self.entries if e.kind == "verdict" and e.index > last]
+
+    def anchor(self, batch: int | None = None, force: bool = False) -> LedgerEntry | None:
+        """Append a Merkle anchor over pending verdicts if at least `batch` are waiting."""
+        with self._lock:
+            pending = self.unanchored_verdicts()
+            if not pending or (not force and batch is not None and len(pending) < batch):
+                return None
+            leaves = [bytes.fromhex(self.entries[i].entry_hash) for i in pending]
+            return self.append("merkle_anchor", {"root": merkle_root(leaves), "first": pending[0],
+                                                 "last": pending[-1], "members": pending})
+
+    # --- proofs ----------------------------------------------------------------------------
+    def inclusion_proof(self, index: int) -> dict | None:
+        """Proof that verdict `index` is under an anchored Merkle root, or None if still pending."""
+        for a in self.entries:
+            if a.kind == "merkle_anchor" and index in a.payload["members"]:
+                members = a.payload["members"]
+                leaves = [bytes.fromhex(self.entries[i].entry_hash) for i in members]
+                return {"index": index, "leaf": self.entries[index].entry_hash,
+                        "root": a.payload["root"], "anchor_index": a.index,
+                        "proof": inclusion_proof(members.index(index), leaves)}
+        return None
+
+    @staticmethod
+    def check_proof(proof: dict) -> bool:
+        return verify_inclusion(bytes.fromhex(proof["leaf"]), proof["proof"], proof["root"])
+
+    # --- verification ----------------------------------------------------------------------
     def verify_chain(self) -> tuple[bool, str]:
         prev = GENESIS
         for e in self.entries:
@@ -76,3 +111,6 @@ class HashChainLedger:
                 return False, f"entry {e.index}: bad ML-DSA signature"
             prev = e.entry_hash
         return True, f"{len(self.entries)} entries verified"
+
+    def by_kind(self, kind: str) -> list[LedgerEntry]:
+        return [e for e in self.entries if e.kind == kind]
