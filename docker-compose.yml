@@ -1,24 +1,35 @@
 # One-command demo (NFR-14):  docker compose up --build
-#   API + docs:  http://localhost:8000/docs
-#   Dashboard:   http://localhost:5173
+#   API + interactive docs:   http://localhost:8000/docs
+#   Dashboard (Trust Console): http://localhost:5173
+#   Advisory ops service:      http://localhost:8100/incidents
 services:
-  api:
+  redis:                              # telemetry mirror (Redis Streams, stream "qsentinel:telemetry")
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+
+  api:                                # trust kernel + API. The image contains NO ML libraries.
     build: { context: ., dockerfile: deploy/Dockerfile.api }
     environment:
-      QSENTINEL_PROFILE: fast          # fast (L=32, n=64) | full (L=256, n=256)
+      QSENTINEL_PROFILE: fast         # fast (L=32, n=64) | full (L=256, n=256)
       CORS_ORIGINS: http://localhost:5173
+      QSENTINEL_REDIS_URL: redis://redis:6379/0
+      # QSENTINEL_API_KEYS: "k1=alice:signer,k2=bob:verifier,k3=soc:analyst,k4=root:admin"
     ports: ["8000:8000"]
+    depends_on: [redis]
 
-  web:
+  ops:                                # AI operations plane - advisory only, separate image with ML deps
+    build: { context: ., dockerfile: deploy/Dockerfile.ops }
+    environment:
+      QSENTINEL_API_URL: http://api:8000
+      CORS_ORIGINS: http://localhost:5173
+      # QSENTINEL_OPS_KEY: k3         # an analyst key, only when QSENTINEL_API_KEYS is set
+    ports: ["8100:8100"]
+    depends_on: [api]
+
+  web:                                # the dashboard, built once and served by nginx
     build:
       context: .
       dockerfile: deploy/Dockerfile.web
-      args: { VITE_API_URL: http://localhost:8000 }
+      args: { VITE_API_URL: "http://localhost:8000", VITE_OPS_URL: "http://localhost:8100" }
     ports: ["5173:80"]
-    depends_on: [api]
-
-  # Phase 3+ (uncomment when used):
-  # redis:        # telemetry bus with read-only ACL for the ops plane
-  #   image: redis:7-alpine
-  # ops:          # AI operations plane - advisory only, separate image with ML deps
-  #   build: { context: ops }
+    depends_on: [api, ops]

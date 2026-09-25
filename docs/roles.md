@@ -45,15 +45,18 @@ Six roles (SIH team size). Each person owns folders, reviews PRs there, and star
 - [ ] Phase 3: a 4-node Fabric network in `chain/` with Go chaincode (see `chain/README.md`).
 
 ## Frontend Lead
-- [ ] Ledger page (`GET /ledger`, `GET /ledger/verify`) showing the chain-valid badge.
-- [ ] Download the proof certificate as JSON/PDF from `VerdictCard`, with a QR code.
-- [ ] Trade-off chart from `GET /calibration`: n vs noise tolerance.
-- [ ] Live Bloch-sphere animation of the round being verified.
-- [ ] Mobile layout pass.
+- [x] Trust Console built to `docs/frontend-spec.md`: 10 pages, live WebSocket feed, attack-class chips, Presenter Mode, session record/replay.
+- [x] Ledger page with chain verification, Merkle anchors and the auditor.
+- [x] Proof certificate: JSON download, print/PDF, QR code, in-browser Merkle verification.
+- [x] Trade-off chart and calculator from `GET /calibration`.
+- [x] 3-D channel ellipsoid driven by the live Pauli fingerprint.
+- [ ] Mobile layout pass (basic responsive layout exists; test on a phone).
+- [ ] Security report page (FR-16) once `GET /report` exists.
 
 ## Team Lead
 - [ ] Fill in names above and uncomment `.github/CODEOWNERS`.
 - [ ] Protect `main`: require PRs and CI. (On a free personal account, branch protection or rulesets need a **public** repo or GitHub Pro/Team.)
 - [ ] Redis Streams telemetry bus with a read-only ACL for `ops/`. (Streams mirror in `qsentinel/telemetry.py` done by Shubham Kumar; ACL user still open.)
-- [ ] Demo script (under 6 min): honest → forgery → intercept slider → replay → ledger check.
+- [x] Demo script (under 6 min): built into the dashboard as Presenter Mode (`web/src/demo/PresenterMode.tsx`).
+- [x] Advisory ops service for the dashboard (`ops/qsentinel_ops/server.py`) and docker-compose wiring (Redis, API, ops, web).
 - [ ] A pre-recorded backup video of the demo.

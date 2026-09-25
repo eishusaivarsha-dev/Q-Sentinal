@@ -371,16 +371,23 @@ Base URL: `VITE_API_URL` (default `http://localhost:8000`). Auth header: `X-API-
 | WS | `/ws/telemetry?key=` | analyst | stream of `TelemetryEvent` |
 | POST | `/signers/{id}`, `/verifiers/{id}`, `/honeypots/{signer}` | admin | enrolment |
 
-### NOT BUILT (mock these; the backend team will add them)
+### ADDED since the first version of this spec (all implemented in `qsentinel/api/main.py` and used by `web/`)
 | Method | Path | Purpose |
 |---|---|---|
-| - | add `ledger_index` to the telemetry `verdict` event | link feed rows to the Inspector |
-| GET | `/verdicts/{ledger_index}` | full `Verdict` for any past verification |
-| POST | `/sweeps` `{attack, min, max, steps, trials, noise, full}` | server-side sweep (same rows as the CLI) |
-| - | `channel.eve_bases` on `/verify` | craft single-basis probes from the UI |
-| - | telemetry kinds `ledger_entry`, `link_commissioned` | live ledger updates without polling |
-| GET | `/ops/incidents` | advisory clusters + narration (Phase 4) |
-| GET | `/report` | FR-16 security report data (until then, compile client-side) |
+| - | telemetry `verdict` events now carry `ledger_index`, per-basis `rates`, `pauli`, fingerprint, CUSUM, CHSH | feed rows link to the Inspector; live ellipsoid |
+| - | telemetry kind `ledger_entry` (every ledger append) | live ledger updates |
+| GET | `/overview` | Mission Control KPIs in one call |
+| GET | `/participants` | signers, verifiers, honeypot count |
+| GET | `/verdicts?limit=` and `/verdicts/{ledger_index}` | recent verdict summaries; the full `Verdict` for any past verification |
+| POST | `/sweeps` `{attack, min, max, steps, trials, noise, full}` | server-side sweep on a throw-away system (same rows as the CLI) |
+| - | `channel.eve_bases`, `channel.entangle_basis` on `/verify` and `/attacks/run` | craft single-basis probes from the UI |
+| - | `/links` now includes `latest`, `status` and `history` per link | Channel Observatory without polling telemetry |
+| GET | `/incidents` on the **ops service** (port 8100, `ops/qsentinel_ops/server.py`) | advisory clusters + narration |
+
+### Still open
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/report` | FR-16 security report data (today: print the Verdict Inspector / download certificates) |
 
 ## 11. Data types (TypeScript), matching real responses
 
