@@ -19,6 +19,7 @@ web/dist/
 
 # Secrets & local state - NEVER commit keys or tokens
 .env
+*.local
 *.pem
 *.key
 qiskit-ibm.json

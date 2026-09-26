@@ -1,7 +1,7 @@
 // In-browser Merkle inclusion check, same construction as qsentinel/ledger/merkle.py (RFC 6962
 // style, SHA3-256, 0x00 leaf / 0x01 node prefixes). Lets anyone verify a proof without trusting us.
-import { sha3_256 } from "@noble/hashes/sha3";
-import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
+import { sha3_256 } from "@noble/hashes/sha3.js";
+import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 
 function concat(...parts: Uint8Array[]) {
   const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));

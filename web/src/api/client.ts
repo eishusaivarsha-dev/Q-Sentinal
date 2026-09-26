@@ -1,6 +1,6 @@
 // Thin client for the FastAPI backend and the advisory ops service. The browser never decides a
 // verdict: it only displays what these endpoints return.
-import { useSession } from "../state/session";
+import { useSession } from "@/state/session";
 import type {
   AttackInfo, AttackRun, Audit, CalibrationRow, ChannelIn, Health, LedgerEntry, LinkStatus, MerkleProof,
   OpsResult, Overview, Participants, SweepRow, TelemetryEvent, Verdict, VerdictSummary,
@@ -9,6 +9,8 @@ import type {
 export const API_URL: string = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 export const OPS_URL: string = import.meta.env.VITE_OPS_URL ?? "http://localhost:8100";
 
+// The API key lives in sessionStorage only. It is never put in a URL, except the WebSocket
+// `?key=` that the backend requires (state/telemetry.ts).
 const KEY_NAME = "qs-api-key";
 export function getApiKey(): string {
   try {
@@ -36,10 +38,11 @@ async function request<T>(path: string, init: RequestInit = {}, base = API_URL):
   const session = useSession.getState();
   const method = (init.method ?? "GET").toUpperCase();
   const url = base + path;
+  const body = typeof init.body === "string" ? init.body : undefined;
   if (session.replay) {
-    const hit = session.lookup(url, method);
+    const hit = session.lookup(url, method, body);
     if (hit !== undefined) return hit as T;
-    throw new ApiError(409, method === "GET" ? "Not in the recorded session" : "Replay mode is read-only");
+    throw new ApiError(409, method === "GET" ? "Not in the recorded session" : "This action was not recorded in the session");
   }
   const headers = new Headers(init.headers);
   if (init.body) headers.set("Content-Type", "application/json");
@@ -62,7 +65,7 @@ async function request<T>(path: string, init: RequestInit = {}, base = API_URL):
     throw new ApiError(res.status, msg);
   }
   const data = (await res.json()) as T;
-  session.record(url, method, data);
+  session.record(url, method, data, body);
   return data;
 }
 

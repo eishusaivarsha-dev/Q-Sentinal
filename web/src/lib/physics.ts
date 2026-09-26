@@ -1,11 +1,36 @@
 // Display-only maths (docs/frontend-spec.md §7). The backend's numbers are the ground truth;
 // these formulas draw them and power the interactive Security Bounds calculator.
-import type { Rates } from "../api/types";
+import type { LinkStatus, Pauli, Rates } from "@/api/types";
 
-/** A Pauli channel squashes the Bloch sphere into an ellipsoid with axis_b = 1 - 2 * errorRate_b. */
+export const CLASSICAL_S = 2;
+export const TSIRELSON_S = 2 * Math.SQRT2;
+
+/** A Pauli channel squashes the Bloch sphere into an ellipsoid with axis_b = 1 - 2 x errorRate_b (exact). */
 export function ellipsoidAxes(r: Rates | null | undefined) {
-  const f = (x: number) => Math.min(1, Math.max(0.04, 1 - 2 * x));
-  return r ? { x: f(r.X), y: f(r.Y), z: f(r.Z) } : { x: 1, y: 1, z: 1 };
+  return r ? { x: 1 - 2 * r.X, y: 1 - 2 * r.Y, z: 1 - 2 * r.Z } : { x: 1, y: 1, z: 1 };
+}
+
+/** Human name for the ellipsoid's shape: sphere, uniform shrink, or a cigar/pancake along an axis. */
+export function ellipsoidShape(r: Rates | null | undefined): string {
+  const a = ellipsoidAxes(r);
+  const v = [a.x, a.y, a.z];
+  const names = ["X", "Y", "Z"];
+  const max = Math.max(...v);
+  const min = Math.min(...v);
+  if (max - min < 0.02) return max > 0.97 ? "Pristine sphere" : "Uniform shrink";
+  const hi = v.indexOf(max);
+  if (v.every((x, i) => i === hi || max - x > 0.02)) return `${names[hi]}-cigar`;
+  return `${names[v.indexOf(min)]}-pancake`;
+}
+
+export function baselineRates(l: LinkStatus): Rates {
+  const r = (k: string) => (l.baseline.per_basis[k] ? l.baseline.per_basis[k][0] / (l.baseline.per_basis[k][1] || 1) : 0);
+  return { Z: r("0"), X: r("1"), Y: r("2") };
+}
+
+export function pauliOf(r: Rates): Pauli {
+  const c = (x: number) => Math.max(0, x);
+  return { pX: c((r.Z + r.Y - r.X) / 2), pY: c((r.Z + r.X - r.Y) / 2), pZ: c((r.X + r.Y - r.Z) / 2) };
 }
 
 export const chsh = (zz: number, xx: number) => Math.SQRT2 * (zz + xx);
@@ -42,27 +67,4 @@ export function log10ExactForgery(n: number, tau: number, q: number) {
   }
   const m = Math.max(...terms);
   return (m + Math.log(terms.reduce((s, t) => s + Math.exp(t - m), 0))) / Math.LN10;
-}
-
-export function sci(x: number | null | undefined, digits = 2): string {
-  if (x === null || x === undefined || Number.isNaN(x)) return "–";
-  if (x === 0) return "0";
-  if (Math.abs(x) >= 1e-3 && Math.abs(x) < 1e4) return x.toPrecision(3);
-  const e = Math.floor(Math.log10(Math.abs(x)));
-  return `${(x / 10 ** e).toFixed(digits)} × 10^${e}`;
-}
-
-export function sciFromLog10(l: number): string {
-  if (l > -3) return (10 ** l).toPrecision(3);
-  const e = Math.floor(l);
-  return `${(10 ** (l - e)).toFixed(2)} × 10^${e}`;
-}
-
-export const pct = (x: number | null | undefined, d = 1) => (x === null || x === undefined ? "–" : `${(x * 100).toFixed(d)}%`);
-
-export function ago(ts: number): string {
-  const s = Math.max(0, Date.now() / 1000 - ts);
-  if (s < 60) return `${Math.round(s)}s ago`;
-  if (s < 3600) return `${Math.round(s / 60)}m ago`;
-  return `${Math.round(s / 3600)}h ago`;
 }
