@@ -1,0 +1,243 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm,braket,booktabs,longtable,hyperref}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\title{Q-SENTINEL D1: Mathematical Model and Protocol Specification}
+\author{Quantum / Detection Workstream}
+\date{2026}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newtheorem{definition}{Definition}
+\newtheorem{corollary}{Corollary}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This document is the mathematical specification for the D1--D6 Q-SENTINEL
+prototype. It fixes the six-state Pauli alphabet, Bell-pair resource,
+teleportation measurement/correction map, verification predicate, basis-guessing
+forgery bound, Hoeffding/Chernoff calibration quantities, and the observables
+used by the six deterministic detectors. The probability statements are
+proved under the explicit independent-round and basis-guessing model. A real
+security proof for a complete deployed QDS protocol would additionally require
+an authenticated classical channel, a composable security definition, and
+independent peer review.
+\end{abstract}
+
+\section{Notation and State Alphabet}
+Let $\mathcal{B}=\{X,Y,Z\}$ denote the Pauli measurement bases. The six allowed
+public-key states are
+\begin{align*}
+Z &: \ket{0},\ket{1},\\
+X &: \ket{+}=\frac{\ket{0}+\ket{1}}{\sqrt2},\quad
+     \ket{-}=\frac{\ket{0}-\ket{1}}{\sqrt2},\\
+Y &: \ket{+i}=\frac{\ket{0}+i\ket{1}}{\sqrt2},\quad
+     \ket{-i}=\frac{\ket{0}-i\ket{1}}{\sqrt2}.
+\end{align*}
+For each round $j\in\{1,\ldots,n\}$, a basis $B_j\in\mathcal B$ and an
+associated eigenstate label $E_j$ are generated from a classical seed. The
+expected projective outcome is denoted $e_j\in\{0,1\}$, with plus/0 eigenstates
+mapped to $0$ and minus/1 eigenstates mapped to $1$.
+
+\section{Bell Resource and Teleportation}
+The shared resource is
+\[
+\ket{\Phi^+}_{BC}=\frac{\ket{00}+\ket{11}}{\sqrt2}.
+\]
+Let the input qubit be
+\[
+\ket{\psi}_A=\alpha\ket0+\beta\ket1,\qquad
+|\alpha|^2+|\beta|^2=1.
+\]
+The standard Bell-state measurement (BSM) on $A,B$ yields two classical bits
+$m_1m_2$. The receiver's state before correction is, up to a global phase,
+\begin{equation}
+\ket{\psi_C^{\rm raw}}=P_{m_1m_2}\ket\psi,
+\end{equation}
+where
+\[
+\begin{array}{c|c}
+ m_1m_2 & P_{m_1m_2} \\ \hline
+ 00 & I\\
+ 01 & X\\
+ 10 & Z\\
+ 11 & XZ
+\end{array}
+\]
+and the receiver applies the same Pauli operator to undo the BSM-dependent
+rotation. Therefore
+\begin{equation}
+P_{m_1m_2}^\dagger P_{m_1m_2}\ket\psi=\ket\psi.
+\end{equation}
+Since Pauli operators are unitary, the correction preserves normalization and
+fidelity.
+
+\begin{lemma}[Uniform BSM outcomes]
+For a maximally entangled $\ket{\Phi^+}$ resource, each Bell-basis outcome has
+probability $1/4$, independently of the input pure state.
+\end{lemma}
+\begin{proof}
+The teleportation decomposition is
+\[
+\ket\psi\ket{\Phi^+}
+=\frac12\sum_{k=1}^4 \ket{\mathrm{Bell}_k}\,P_k\ket\psi.
+\]
+Each branch has amplitude norm $1/2$, hence probability $1/4$.
+\end{proof}
+
+\section{QDS Key Material and Public-Key Distribution}
+A seed expands deterministically to
+\[
+K=((B_1,E_1),\ldots,(B_n,E_n)),
+\qquad B_j\in\{X,Y,Z\}.
+\]
+The corresponding eigenstates are teleported through the Bell-pair resource.
+The software records pair-provenance identifiers and a commitment
+\[
+C=H(\mathrm{verifier\_id}\parallel B_1\parallel\cdots\parallel B_n).
+\]
+A signature envelope contains the message digest $H(M)$, commitment $C$, a
+fresh nonce, verifier identity, and pair-provenance identifiers.
+
+\section{Verification Predicate}
+For round $j$, the verifier performs a projective measurement in the committed
+basis $B_j$ and obtains $M_j\in\{0,1\}$. Define
+\[
+D=\sum_{j=1}^n \mathbf 1[M_j\neq e_j],
+\qquad r=\frac{D}{n}.
+\]
+In the noiseless honest model each distributed public-key state is exactly an
+eigenstate of its verification basis, so
+\[
+D=0 \quad\text{with probability }1.
+\]
+The D3 reference implementation therefore accepts an untampered signature if
+and only if all message, identity, commitment, provenance, freshness, and
+projective-measurement predicates pass the configured mismatch threshold.
+
+\begin{theorem}[Deterministic honest acceptance]
+In the ideal noiseless model, with matching message digest, verifier identity,
+basis commitment, pair provenance and fresh nonce, the honest signature is
+accepted with probability $1$ when the mismatch threshold is zero.
+\end{theorem}
+\begin{proof}
+Each measurement is performed in the eigenbasis of the distributed state, so
+$M_j=e_j$ deterministically for every $j$. Hence $D=0$. All classical binding
+predicates are equalities by construction, and freshness holds for a new nonce.
+Therefore every term in the acceptance predicate is true.
+\end{proof}
+
+\section{Basis-Guessing Forgery Bound}
+Assume an attacker does not know the committed basis sequence and that rounds
+are independent. For a two-basis alphabet $\{X,Z\}$, the attacker chooses the
+correct basis with probability $1/2$ and otherwise measures in the wrong basis,
+which produces a random eigenvalue. Even in the wrong-basis case the attacker
+can guess the expected sign with probability $1/2$, so
+\[
+p_2=\frac12(1)+\frac12\left(\frac12\right)=\frac34.
+\]
+For the six-state alphabet $\{X,Y,Z\}$,
+\[
+p_6=\frac13(1)+\frac23\left(\frac12\right)=\frac23.
+\]
+
+\begin{theorem}[Independent-round forgery bound]
+Under the basis-guessing model above, the probability that a forger passes all
+$n$ rounds satisfies
+\[
+P_{\mathrm{forge}}(n)\le p^n,
+\qquad p\in\left\{\frac34,\frac23\right\}.
+\]
+\end{theorem}
+\begin{proof}
+The probability of passing a single round is at most $p$. Independence of the
+rounds gives the product bound $p^n$.
+\end{proof}
+
+\begin{corollary}[Numerical values]
+At $n=128$,
+\[
+\left(\frac34\right)^{128}\approx 1.0182\times10^{-16},
+\]
+and
+\[
+\left(\frac23\right)^{128}\approx 2.8862\times10^{-23}.
+\]
+At $n=256$ the corresponding values are approximately
+$1.0368\times10^{-32}$ and $8.3299\times10^{-46}$.
+The first 128-round value is the explicit D3 benchmark quoted in the project
+dossier.
+\end{corollary}
+
+\section{Hoeffding and Chernoff Statistical Bounds}
+Let $X_1,\ldots,X_n\in\{0,1\}$ be mismatch indicators with mean $p$. Hoeffding's
+one-sided inequality gives
+\[
+\Pr\left(\hat p-p\ge\varepsilon\right)\le e^{-2n\varepsilon^2}.
+\]
+For a target one-sided error budget $\alpha$,
+\[
+\varepsilon_\alpha=\sqrt{\frac{\ln(1/\alpha)}{2n}},
+\qquad
+p_{\rm th}=p+\varepsilon_\alpha.
+\]
+The Bernoulli Chernoff--KL form is
+\[
+\Pr(\hat p\ge q)\le
+\exp\left[-nD_{\mathrm{KL}}(q\Vert p)\right],
+\]
+with
+\[
+D_{\mathrm{KL}}(q\Vert p)=q\ln\frac qp+(1-q)\ln\frac{1-q}{1-p}.
+\]
+The D5 implementation exposes both bounds. For finite-sample validation it
+also computes the exact binomial operating probability; the exact tail should
+not be confused with the generally looser concentration upper bound.
+
+\section{Channel and Entanglement Observables}
+Define
+\[
+\mathrm{QBER}=\frac{D}{n}.
+\]
+The Bell-state integrity monitor uses the CHSH value $S$ and Bell-state fidelity
+\[
+F_{\Phi^+}=\bra{\Phi^+}\rho\ket{\Phi^+}.
+\]
+The classical CHSH limit is $S\le2$ and the quantum Tsirelson bound is
+$S\le2\sqrt2$. The D4 channel detector combines QBER, a four-outcome $\chi^2$
+goodness-of-fit test on BSM counts, a one-sided CUSUM, and Wald's SPRT.
+
+\section{Freshness, Identity and Provenance}
+Every signature carries a nonce. A consumed nonce cannot be reused. The D4
+replay guard maintains an explicit registry. The identity-binding detector
+checks verifier identity, basis commitment, message binding and Bell-pair
+provenance. These predicates can be mirrored by the team's permissioned ledger
+without importing a learned model into the trust path.
+
+\section{Six-Detector Mapping}
+\begin{longtable}{lll}
+\toprule
+Detector & Attack / purpose & Primary evidence\\
+\midrule
+D1 & Baseline integrity & eigenstate measurement mismatch\\
+D2 & Signature forgery & Hoeffding/Chernoff mismatch bound\\
+D3 & Entanglement hijack & CHSH and Bell fidelity\\
+D4 & Intercept-resend / collective attacks & QBER, $\chi^2$, CUSUM, SPRT\\
+D5 & Replay attacks & nonce freshness\\
+D6 & Impersonation / unauthorized verification & identity, commitment, provenance\\
+\bottomrule
+\end{longtable}
+
+\section{Implementation and Security Boundary}
+The D2--D6 code is a simulation-first engineering artifact. Its deterministic
+rules can be audited and reproduced, but the repository does not claim a
+composable end-to-end security proof for all protocol environments. A
+publication-grade QDS security proof must additionally specify the authenticated
+classical channel, adversary capabilities, key distribution assumptions, finite
+sample effects, noise model, multi-verifier composition, and a formal security
+notion. Those assumptions are deliberately visible here rather than hidden.
+
+\end{document}

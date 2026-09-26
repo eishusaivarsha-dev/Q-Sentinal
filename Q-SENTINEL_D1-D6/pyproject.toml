@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qsentinel"
+version = "1.0.0"
+description = "Q-SENTINEL D1-D6 quantum/QDS/detection prototype"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "numpy>=2.0,<3",
+  "scipy>=1.13,<2",
+  "PyYAML>=6.0,<7",
+]
+
+[project.optional-dependencies]
+quantum = [
+  "qiskit==2.5.0",
+  "qiskit-aer==0.17.2",
+]
+dev = [
+  "pytest>=8.0,<10",
+]
+
+[tool.setuptools.packages.find]
+include = ["qsentinel*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-ra"

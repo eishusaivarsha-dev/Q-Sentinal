@@ -1,0 +1,165 @@
+openapi: 3.1.0
+info:
+  title: Q-SENTINEL QDS API
+  version: 1.0.0
+  description: D3 QDS engine integration contract for backend, detection and SOC layers.
+paths:
+  /qds/sign:
+    post:
+      summary: Create a QDS signature envelope
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignRequest'
+      responses:
+        '200':
+          description: Signature envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Signature'
+        '400':
+          description: Invalid request
+  /qds/verify:
+    post:
+      summary: Verify a QDS signature
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyRequest'
+      responses:
+        '200':
+          description: Verification result and machine-readable evidence transcript
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerificationResult'
+        '400':
+          description: Invalid request
+  /detect/evaluate:
+    post:
+      summary: Evaluate an existing verification evidence record with the six AI-free detectors
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DetectionEvidence'
+      responses:
+        '200':
+          description: Detector results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  overall_alert: {type: boolean}
+                  detectors:
+                    type: object
+                    additionalProperties:
+                      $ref: '#/components/schemas/DetectorResult'
+components:
+  schemas:
+    SignRequest:
+      type: object
+      required: [message]
+      properties:
+        message: {type: string}
+        nonce:
+          type: [string, 'null']
+    Signature:
+      type: object
+      required: [message_digest, basis_commitment, nonce, verifier_id, pair_ids]
+      properties:
+        message_digest: {type: string}
+        basis_commitment: {type: string, minLength: 64, maxLength: 64}
+        nonce: {type: string, minLength: 1}
+        verifier_id: {type: string, minLength: 1}
+        pair_ids:
+          type: array
+          items: {type: string}
+    VerifyRequest:
+      type: object
+      required: [message, signature]
+      properties:
+        message: {type: string}
+        signature: {$ref: '#/components/schemas/Signature'}
+        nonce_already_used: {type: boolean, default: false}
+        mismatch_threshold: {type: integer, minimum: 0, default: 0}
+    VerificationResult:
+      type: object
+      required:
+        - accepted
+        - message_digest
+        - verifier_id
+        - nonce
+        - observed
+        - expected
+        - bases
+        - mismatches
+        - rounds
+        - basis_commitment_ok
+        - message_binding_ok
+        - pair_provenance_ok
+        - identity_ok
+        - nonce_fresh
+      properties:
+        accepted: {type: boolean}
+        message_digest: {type: string}
+        verifier_id: {type: string}
+        nonce: {type: string}
+        observed: {type: array, items: {type: integer, minimum: 0, maximum: 1}}
+        expected: {type: array, items: {type: integer, minimum: 0, maximum: 1}}
+        bases: {type: array, items: {type: string, enum: [X, Y, Z]}}
+        mismatches: {type: integer, minimum: 0}
+        rounds: {type: integer, minimum: 1}
+        basis_commitment_ok: {type: boolean}
+        message_binding_ok: {type: boolean}
+        pair_provenance_ok: {type: boolean}
+        identity_ok: {type: boolean}
+        nonce_fresh: {type: boolean}
+        transcript: {type: object, additionalProperties: true}
+    DetectionEvidence:
+      type: object
+      required:
+        - observed
+        - expected
+        - bases
+        - verifier_id
+        - expected_verifier_id
+        - nonce
+        - nonce_already_used
+        - basis_commitment
+        - expected_basis_commitment
+        - pair_ids
+        - expected_pair_ids
+      properties:
+        observed: {type: array, items: {type: integer, minimum: 0, maximum: 1}}
+        expected: {type: array, items: {type: integer, minimum: 0, maximum: 1}}
+        bases: {type: array, items: {type: string, enum: [X, Y, Z]}}
+        verifier_id: {type: string}
+        expected_verifier_id: {type: string}
+        nonce: {type: string}
+        nonce_already_used: {type: boolean}
+        basis_commitment: {type: string}
+        expected_basis_commitment: {type: string}
+        pair_ids: {type: array, items: {type: string}}
+        expected_pair_ids: {type: array, items: {type: string}}
+        bsm_counts: {type: object, additionalProperties: {type: integer, minimum: 0}}
+        chsh_value: {type: [number, 'null']}
+        bell_fidelity: {type: [number, 'null']}
+        message_digest_ok: {type: boolean, default: true}
+        attack_label: {type: [string, 'null']}
+    DetectorResult:
+      type: object
+      required: [name, detected, score, threshold, details]
+      properties:
+        name: {type: string}
+        detected: {type: boolean}
+        score: {type: [number, 'null']}
+        threshold: {type: [number, 'null']}
+        details: {type: object, additionalProperties: true}

@@ -1,0 +1,144 @@
+OVERALL PASS: True
+{
+  "D1": {
+    "forgery_bounds": {
+      "six_state": 2.886149616041074e-23,
+      "two_basis": 1.0182202130902542e-16
+    },
+    "n": 128,
+    "required_sections_all_present": true,
+    "required_sections_present": {
+      "Bell": true,
+      "CHSH": true,
+      "Hoeffding": true,
+      "Verification Predicate": true,
+      "\\\\frac23": true,
+      "\\\\frac34": true
+    },
+    "specification_exists": true
+  },
+  "D2": {
+    "all_fidelities_ge_0_99": true,
+    "bsm_chi_square": {
+      "chi2": 0.892578125,
+      "degrees_of_freedom": 3.0,
+      "p_value": 0.8272184991546699,
+      "uniform": true
+    },
+    "bsm_counts": {
+      "00": 1036,
+      "01": 1020,
+      "10": 1039,
+      "11": 1001
+    },
+    "bsm_uniform_p_gt_0_05": true,
+    "min_ideal_teleport_fidelity": 1.0
+  },
+  "D3": {
+    "accepted": 10000,
+    "frr": 0.0,
+    "honest_signatures": 10000,
+    "pass": true,
+    "rejected": 0
+  },
+  "D4": {
+    "D1": {
+      "details": {
+        "mismatch_rate": 0.0078125,
+        "mismatches": 1,
+        "rounds": 128
+      },
+      "detected": true
+    },
+    "D2": {
+      "details": {
+        "chernoff_bound": 0.0,
+        "forgery_probability_upper_bound": 0.0,
+        "hoeffding_bound": 6.616261056709485e-112,
+        "mismatch_rate": 1.0,
+        "rounds": 128
+      },
+      "detected": true
+    },
+    "D3": {
+      "details": {
+        "bell_fidelity": 0.75,
+        "chsh": 1.8,
+        "classical_chsh_bound": 2.0,
+        "min_bell_fidelity": 0.9,
+        "min_chsh": 2.0,
+        "telemetry_complete": true,
+        "tsirelson_bound": 2.8284271247461903
+      },
+      "detected": true
+    },
+    "D4": {
+      "details": {
+        "chi_square": {
+          "chi2": 4128.571428571429,
+          "degrees_of_freedom": 3.0,
+          "p_value": 0.0,
+          "uniform": false
+        },
+        "cusum": {
+          "alarm": true,
+          "reference": 0.12,
+          "statistic": 43.49999999999998,
+          "threshold": 22.627416997969522
+        },
+        "qber": 0.390625,
+        "qber_six_state_intercept_resend_reference": 0.3333333333333333,
+        "qber_threshold": 0.12,
+        "qber_two_basis_intercept_resend_reference": 0.25,
+        "sprt": {
+          "decision": "H1_ATTACK",
+          "log_likelihood_ratio": 6.437751649736401,
+          "lower_boundary": -4.59511985013459,
+          "samples": 2,
+          "upper_boundary": 4.59511985013459
+        }
+      },
+      "detected": true
+    },
+    "D5": {
+      "details": {
+        "already_used": true,
+        "nonce": "d5"
+      },
+      "detected": true
+    },
+    "D6": {
+      "details": {
+        "basis_commitment_mismatch": true,
+        "identity_mismatch": true,
+        "message_digest_mismatch": false,
+        "pair_provenance_mismatch": false
+      },
+      "detected": true
+    }
+  },
+  "D5": {
+    "analytic_far": 0.01206585516875565,
+    "baseline_rate": 0.05,
+    "ci_high": 0.01226210537356142,
+    "ci_low": 0.0109354180913342,
+    "confidence": 0.95,
+    "empirical_far": 0.01158,
+    "false_alarms": 1158,
+    "hoeffding_bound": 0.5063004556733814,
+    "n": 128,
+    "relative_error": 0.04026694850554522,
+    "threshold_count": 13,
+    "threshold_rate": 0.1015625,
+    "trials": 100000,
+    "within_ten_percent": true
+  },
+  "D6": {
+    "all_seven_detected": true,
+    "attacks": 7,
+    "bit_for_bit_reproducible": true,
+    "mapped_detectors_detected": 7,
+    "overall_alerts": 7
+  },
+  "trust_path_guard": true
+}

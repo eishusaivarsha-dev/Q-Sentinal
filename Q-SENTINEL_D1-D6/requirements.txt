@@ -1,0 +1,6 @@
+numpy>=2.0,<3
+scipy>=1.13,<2
+PyYAML>=6.0,<7
+pytest>=8.0,<10
+qiskit==2.5.0
+qiskit-aer==0.17.2

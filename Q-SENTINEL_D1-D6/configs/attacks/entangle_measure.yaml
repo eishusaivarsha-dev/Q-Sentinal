@@ -1,0 +1,5 @@
+attack: entangle_and_measure
+seed: 2026
+strength: 1.0
+expected_detector: D3
+description: Seed-reproducible campaign configuration for the Q-SENTINEL D6 harness.
