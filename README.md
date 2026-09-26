@@ -4,6 +4,9 @@
 *An AI-free threat detection framework for teleportation-based Quantum Digital Signatures, with information-theoretic security.* Smart India Hackathon 2026.
 
 > Quantum physics decides accept/reject. Every verdict is a closed-form statistical rule with a proven error bound, and **no AI/ML is in the trust path** (CI enforces this).
+> An advisory AI watches for fraud, explains what it sees and suggests what to do, **but the analyst makes the final call**, and that decision is signed onto the ledger next to the AI's advice.
+
+**Live demo:** _see "Deploy" below_ · run it yourself in one command: `docker build -t q-sentinel . && docker run -p 7860:7860 q-sentinel` → http://localhost:7860
 
 ## Quick start
 
@@ -40,8 +43,9 @@ Optional extras: `pip install -e ".[qiskit]"` (Aer cross-check), `.[noise]` (QuT
 | `chain/` | L3 | Hyperledger Fabric/Besu network + chaincode (Phase 3) | Blockchain Lead |
 | `qsentinel/attacks/` | L4 | Attack library + YAML campaigns | Security Lead |
 | `qsentinel/api/` | - | FastAPI REST + WebSocket | Team Lead |
-| `web/` | L5 | Trust Console dashboard: 10 pages, live WebSocket feed, Presenter Mode (React, Recharts, Three.js) | Frontend Lead |
-| `ops/` | L5 | AI operations plane, **advisory only**, separate package | Team Lead |
+| `web/` | L5 | Landing page + Trust Console: 13 pages with 3-D scenes, live WebSocket feed, Fraud Review, Presenter Mode (React, React Three Fiber, Recharts, Framer Motion) | Frontend Lead |
+| `ops/` | L5 | AI operations plane, **advisory only**, separate package: incidents, forecasts, anomalies, fraud queue, Sentinel Copilot (Claude or offline) | Team Lead |
+| `Q-SENTINEL_D1-D6/` | - | Stand-alone D1-D6 reference implementation, as delivered; its criteria also run on the integrated system (`python -m qsentinel.acceptance`) | Anansh Jain |
 | `tests/` | - | Unit, integration, and the `test_no_ml_in_trust_path` guard | everyone |
 | `docs/` | - | Architecture, protocol, roles, roadmap | everyone |
 
@@ -58,7 +62,19 @@ Optional extras: `pip install -e ".[qiskit]"` (Aer cross-check), `.[noise]` (QuT
 - The forgery bound, validated through the simulator, is within 0.9% of the exact formula.
 - The Qiskit Aer backend now supplies D3's Bell correlators, and a direct CHSH test with rotated (non-Clifford) settings matches the stabilizer-derived S on six channel models (`python -m qsentinel.quantum.chsh_direct`).
 - The dashboard is wired to every backend feature: live alerts, proof certificates with in-browser Merkle verification, the 3-D channel ellipsoid, attacks, sweeps, the ledger auditor, the advisory AI's incidents, and a 7-step Presenter Mode. The 17-scenario campaign also passes 17/17 when run from the browser.
+- **Fraud review (human in the loop):** the advisory AI scores every verification for fraud (0-100, with reasons that trace to detectors or the ledger) and recommends confirm / escalate / monitor / dismiss. The analyst decides in the Fraud Review page; `POST /reviews/{i}` chains that decision on the ML-DSA ledger with the AI's suggestion and whether they agreed. The verdict itself is never changed.
+- **Sentinel Copilot** answers questions about verdicts, links, forecasts and the fraud queue, citing ledger entries. With `ANTHROPIC_API_KEY` set it uses Claude (`claude-opus-5` by default, server-side refusal fallback on); without it an offline analyst answers from the same read-only brief.
+- **3-D front end:** landing page with a 3-D entangled-core hero and a scroll-driven 3-D protocol story; live 3-D quantum network, Bloch-sphere teleportation lab, 3-D channel ellipsoid, 3-D ledger chain and a fraud "risk orb" in the console.
+- The D1-D6 acceptance criteria run against this build from the dashboard's Report page (`GET /report/acceptance`).
 - Not yet implemented: measure-on-receipt mode, Fabric, and IBM hardware. See [docs/roles.md](docs/roles.md).
+
+## Deploy
+
+The root `Dockerfile` builds one public image: nginx serves the dashboard on `$PORT` and proxies `/api` to the trust kernel and `/ops` to the advisory AI, each in its own virtual environment (the kernel's has no ML library; the build fails if one sneaks in).
+
+- **Render (free):** New → Blueprint → this repository. `render.yaml` configures everything; optionally add `ANTHROPIC_API_KEY` in the dashboard.
+- **Hugging Face Spaces / Koyeb / Railway / Fly:** any host that runs a Dockerfile and sets `$PORT`.
+- **Local:** `docker build -t q-sentinel . && docker run -p 7860:7860 q-sentinel`, or `docker compose up --build` for separate containers plus Redis.
 
 ## Docs
 - [docs/FILE_GUIDE.md](docs/FILE_GUIDE.md): what every file in the repository does

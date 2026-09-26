@@ -1,10 +1,12 @@
-// Presenter Mode (docs/frontend-spec.md §9): a clapperboard bar that drives the 7-step demo.
+// Presenter Mode (docs/frontend-spec.md §9): a floating control bar that drives the 7-step demo.
 // Keys: ← → scenes · Space/Enter runs the scene · Esc exits.
 import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
+import { ChevronLeft, ChevronRight, Play, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { errorText } from "@/api/client";
+import { cn } from "@/lib/cn";
 import { useSession } from "@/state/session";
 import { useUi } from "@/state/ui";
 import { SCRIPT, SCRIPT_BUDGET } from "./script";
@@ -63,38 +65,37 @@ export default function PresenterMode() {
   return (
     <AnimatePresence>
       {presenter && (
-        <motion.div initial={{ y: 220 }} animate={{ y: 0 }} exit={{ y: 240 }} transition={{ type: "spring", stiffness: 160, damping: 20 }}
-          className="no-print fixed inset-x-2 bottom-2 z-[80] md:inset-x-6 md:bottom-4 lg:left-[270px]">
-          <div className="panel overflow-hidden !bg-ink/95" style={{ boxShadow: "inset 0 0 0 1px rgba(240,165,58,.5), 0 30px 60px -10px #000" }}>
-            <div className="h-3 w-full" style={{ background: "repeating-linear-gradient(120deg,#e9dcc0 0 18px,#0c0a07 18px 36px)" }} />
-            <div className="grid gap-4 p-4 md:grid-cols-[auto_1fr_auto] md:items-center md:px-6">
-              <div className="flex items-center gap-4">
-                <div className="text-center">
-                  <div className="label">Scene</div>
-                  <div className="font-display text-[40px] leading-none text-amber">{step + 1}<span className="text-[18px] text-paper-faint">/{SCRIPT.length}</span></div>
+        <motion.div initial={{ y: 220, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 240, opacity: 0 }} transition={{ type: "spring", stiffness: 170, damping: 22 }}
+          className="no-print fixed inset-x-3 bottom-3 z-[80] md:inset-x-8 md:bottom-6 lg:left-[300px]">
+          <div className="glass overflow-hidden rounded-3xl shadow-2xl">
+            <div className="h-1 w-full bg-line"><motion.div className="h-1" style={{ background: "linear-gradient(90deg, rgb(var(--brand)), rgb(var(--brand-2)))" }} animate={{ width: `${((step + 1) / SCRIPT.length) * 100}%` }} /></div>
+            <div className="grid gap-5 p-5 md:grid-cols-[auto_1fr_auto] md:items-center md:px-7">
+              <div className="flex items-center gap-6">
+                <div>
+                  <div className="label !text-[11px]">Scene</div>
+                  <div className="text-[38px] font-extrabold leading-none text-brand">{step + 1}<span className="text-[18px] text-ink-3">/{SCRIPT.length}</span></div>
                 </div>
-                <div className="text-center">
-                  <div className="label">Reel</div>
-                  <div className={`data text-[20px] ${over ? "text-reject" : "phosphor"}`}>{mmss(elapsed)}</div>
-                  <div className="data text-[10px] text-paper-faint">of {mmss(SCRIPT_BUDGET)}</div>
+                <div>
+                  <div className="label !text-[11px]">Clock</div>
+                  <div className={cn("data text-[22px] font-semibold", over ? "text-bad" : "text-ink")}>{mmss(elapsed)}</div>
+                  <div className="data text-[11px] text-ink-3">of {mmss(SCRIPT_BUDGET)}</div>
                 </div>
               </div>
               <div className="min-w-0">
-                <div className="flex items-baseline gap-3"><h2 className="font-display text-[24px] text-paper">{s.title}</h2><span className="data text-[11px] text-paper-faint">~{s.seconds}s</span></div>
-                <p className="mt-1 text-[13px] leading-snug text-paper-dim">{s.caption}</p>
-                {result && <p className={`mt-2 rounded-md border hair bg-ink/70 p-2 text-[12px] ${result.startsWith("Error") ? "text-reject" : "text-amber-hot"}`}>{result}</p>}
-                <div className="mt-2 flex gap-1">{SCRIPT.map((_, i) => (
-                  <button key={i} onClick={() => goStep(i)} aria-label={`Scene ${i + 1}`} className={`h-1.5 flex-1 rounded-full ${i < step ? "bg-amber/60" : i === step ? "bg-amber" : "bg-ink-500"}`} />
-                ))}</div>
+                <div className="flex items-baseline gap-3"><h2 className="text-[22px] font-bold text-ink">{s.title}</h2><span className="data text-[12px] text-ink-3">~{s.seconds}s</span></div>
+                <p className="mt-1 text-[15px] leading-snug text-ink-2">{s.caption}</p>
+                {result && <p className={cn("mt-2 rounded-xl border border-line bg-surface-2 p-2.5 text-[14px]", result.startsWith("Error") ? "text-bad" : "text-brand")}>{result}</p>}
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <button className="btn-danger" disabled={busy} onClick={run}>{busy ? "Transmitting…" : "⚡ Run scene"}</button>
-                <button className="btn-ghost" onClick={() => goStep(Math.max(0, step - 1))} disabled={step === 0 || busy}>←</button>
-                <button className="btn-primary" disabled={busy} onClick={() => (step === SCRIPT.length - 1 ? closePresenter() : goStep(step + 1))}>{step === SCRIPT.length - 1 ? "Finish" : "Next →"}</button>
-                <button className="btn-ghost !px-2.5" onClick={closePresenter} aria-label="Exit presenter">✕</button>
+                <button className="btn-danger" disabled={busy} onClick={run}><Play size={16} /> {busy ? "Running…" : "Run scene"}</button>
+                <button className="btn-icon" onClick={() => goStep(Math.max(0, step - 1))} disabled={step === 0 || busy} aria-label="Previous scene"><ChevronLeft size={18} /></button>
+                <button className="btn-primary" disabled={busy} onClick={() => (step === SCRIPT.length - 1 ? closePresenter() : goStep(step + 1))}>
+                  {step === SCRIPT.length - 1 ? "Finish" : <>Next <ChevronRight size={16} /></>}
+                </button>
+                <button className="btn-icon" onClick={closePresenter} aria-label="Exit presenter"><X size={16} /></button>
               </div>
             </div>
-            <div className="border-t hair px-6 py-1.5 font-type text-[10.5px] text-paper-mute">
+            <div className="border-t border-line px-7 py-2 font-mono text-[12px] text-ink-3">
               ← → scenes · Space runs the scene · Esc exits{replay ? " · answering from the recorded session (offline)" : ""}
             </div>
           </div>

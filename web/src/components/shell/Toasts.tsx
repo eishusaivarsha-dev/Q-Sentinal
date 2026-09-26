@@ -1,51 +1,44 @@
+// Live alert toasts: every REJECT or critical verdict from the telemetry feed (spec §3, §14).
+import { AnimatePresence, motion } from "framer-motion";
+import { ShieldAlert, X } from "lucide-react";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { glyphForClass } from "@/lib/attribution";
 import { useTelemetry } from "@/state/telemetry";
-import { AttackGlyph } from "../art/AttackGlyph";
-import { ClassChip, DecisionBadge, DetectorChip } from "./primitives";
+import { DetectorChip } from "../ui";
+import { to } from "./nav";
 
-/** Incident telegrams, rendered synchronously from the WebSocket event (well inside the 1 s SLA). */
-export function Toasts() {
+export default function Toasts() {
   const toasts = useTelemetry((s) => s.toasts);
   const dismiss = useTelemetry((s) => s.dismiss);
-  const navigate = useNavigate();
-
+  const nav = useNavigate();
   useEffect(() => {
-    const timers = toasts.map((t) => setTimeout(() => dismiss(t.id), 10_000));
-    return () => timers.forEach(clearTimeout);
+    if (!toasts.length) return;
+    const id = toasts[0].id;
+    const t = window.setTimeout(() => dismiss(id), 7000);
+    return () => window.clearTimeout(t);
   }, [toasts, dismiss]);
-
   return (
-    <div className="no-print pointer-events-none fixed right-3 top-16 z-[70] flex w-[min(380px,calc(100vw-24px))] flex-col gap-2" aria-live="assertive">
-      {toasts.map(({ id, cls, data, critical }) => {
-        const top = data.alerts.find((a) => a.severity === "critical") ?? data.alerts[0];
-        return (
-          <div key={id} role="alert" className="panel pointer-events-auto animate-slideIn overflow-hidden !bg-[#1d0f0a]/95"
-            style={{ boxShadow: "inset 0 0 0 1px rgba(224,81,58,.55), 0 20px 40px -10px rgba(0,0,0,.9), 0 0 30px -8px rgba(224,81,58,.5)" }}>
-            <div className="flex items-center justify-between border-b border-reject/30 bg-reject/15 px-4 py-1.5">
-              <span className="font-label text-[10px] uppercase tracking-[.3em] text-reject">⚠ {critical ? "Critical" : "Incident"} telegram</span>
-              <span className="data text-[10px] text-paper-faint">#{data.ledger_index} · {data.link}</span>
-            </div>
-            <div className="flex gap-3 p-3">
-              <div className="shrink-0"><AttackGlyph glyph={glyphForClass(cls.label)} size={48} hot /></div>
+    <div className="no-print pointer-events-none fixed bottom-5 right-5 z-[70] flex w-[380px] max-w-[calc(100vw-40px)] flex-col gap-3">
+      <AnimatePresence initial={false}>
+        {toasts.map((t) => (
+          <motion.div key={t.id} layout initial={{ opacity: 0, x: 60, scale: 0.95 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: 60 }}
+            transition={{ type: "spring", stiffness: 320, damping: 28 }}
+            className="card pointer-events-auto cursor-pointer overflow-hidden !border-bad/30 p-4" onClick={() => { nav(to(`verdicts/${t.data.ledger_index}`)); dismiss(t.id); }}>
+            <div className="absolute inset-y-0 left-0 w-1 bg-bad" />
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-bad/12 text-bad"><ShieldAlert size={18} /></span>
               <div className="min-w-0 flex-1">
-                <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-                  <DecisionBadge decision={data.decision} />
-                  <ClassChip cls={cls} />
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate text-[15px] font-bold text-ink">{t.cls.label}</p>
+                  <button onClick={(e) => { e.stopPropagation(); dismiss(t.id); }} className="text-ink-3 hover:text-ink" aria-label="Dismiss"><X size={16} /></button>
                 </div>
-                <div className="flex flex-wrap gap-1">{data.alerts.map((a) => <DetectorChip key={a.detector} id={a.detector} severity={a.severity} />)}</div>
-                {top && <div className="mt-1.5 line-clamp-2 text-[11px] text-paper-dim">{top.detector}: {top.detail}</div>}
-                <div className="mt-2 flex gap-3">
-                  <button onClick={() => { dismiss(id); navigate(`/verdicts/${data.ledger_index}`); }}
-                    className="font-label text-[11px] uppercase tracking-[.18em] text-amber hover:underline">Open proof →</button>
-                  <button onClick={() => dismiss(id)} className="font-label text-[11px] uppercase tracking-[.18em] text-paper-faint hover:text-paper">Dismiss</button>
-                </div>
+                <p className="data mt-0.5 text-[13px] text-ink-3">#{t.data.ledger_index} · {t.data.link} · {t.data.decision}</p>
+                <div className="mt-2 flex flex-wrap gap-1">{t.data.alerts.filter((a) => a.alert && a.severity !== "info").map((a) => <DetectorChip key={a.detector} id={a.detector} severity={a.severity} />)}</div>
               </div>
             </div>
-          </div>
-        );
-      })}
+          </motion.div>
+        ))}
+      </AnimatePresence>
     </div>
   );
 }

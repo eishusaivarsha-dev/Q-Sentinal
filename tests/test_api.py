@@ -88,3 +88,35 @@ def test_rbac(monkeypatch):
     assert client.get("/ledger/audit", headers={"X-API-Key": "ks"}).status_code == 200
     assert client.post("/attacks/run", json={"attack": "honest"},
                        headers={"X-API-Key": "ks"}).status_code == 403
+
+
+def test_quantum_lab_endpoints():
+    t = client.post("/quantum/teleport", json={"state": "+i", "channel": {"intercept_fraction": 1.0}}).json()
+    assert abs(t["fidelity"] - 2 / 3) < 1e-9 and t["correction"] in {"I", "X", "Z", "XZ"} and "OPENQASM" in t["qasm"]
+    assert client.post("/quantum/teleport", json={"state": "bogus"}).status_code == 422
+    b = client.post("/quantum/bsm", json={"shots": 2000, "seed": 1}).json()
+    assert sum(b["counts"].values()) == 2000
+
+
+def test_far_and_acceptance_report():
+    far = client.get("/calibration/far?n=64&tau=0.1&noise=0.04&trials=20000").json()
+    assert far["limit"] == 6 and 0 < far["far_exact"] < 0.05
+    rep = client.get("/report/acceptance").json()
+    assert rep["passed"] and [c["id"] for c in rep["checks"]][:6] == ["D1", "D2", "D3", "D4", "D5", "D6"]
+
+
+def test_analyst_review_is_chained_on_the_ledger_and_never_changes_the_verdict():
+    run = client.post("/attacks/run", json={"attack": "replay", "seed": 11}).json()
+    idx = run["verdict"]["certificate"]["ledger_index"]
+    r = client.post(f"/reviews/{idx}", json={"decision": "confirm_fraud", "note": "replay from client 7",
+                                             "advisory": {"risk": 75, "level": "critical", "category": "Replay",
+                                                          "recommendation": "escalate"}})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["verdict_decision"] == run["decision"] and body["agreed_with_ai"] is False
+    assert body["advisory"]["label"].startswith("ADVISORY")
+    assert client.get(f"/reviews?verdict_index={idx}").json()[-1]["decision"] == "confirm_fraud"
+    assert client.get("/ledger?kind=analyst_review").json()[-1]["index"] == body["index"]
+    assert client.get("/ledger/verify").json()["ok"]
+    assert client.post("/reviews/999999", json={"decision": "dismiss"}).status_code == 404
+    assert client.post(f"/reviews/{idx}", json={"decision": "approve_payment"}).status_code == 422

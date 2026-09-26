@@ -2,7 +2,6 @@
 // never changes a decision - it only puts the detector output into words.
 // Key ordering: D3 measures spare Bell pairs no signature touches, so a clean D3 with a failed D2
 // means "the signature is bad", while a disturbed D3 means "someone is on the channel".
-import type { AttackGlyphName } from "@/components/art/AttackGlyph";
 import type { DetectorResult, Verdict, VerdictEventData } from "@/api/types";
 
 export type Tone = "bad" | "warn" | "ok" | "info";
@@ -86,6 +85,8 @@ export const DETECTORS: Record<DetectorId, { name: string; law: string; instrume
   D6: { name: "Identity binding", instrument: "Custody register",
     law: "Keys are bound to their owner and verifiers to their role. Decoy keys catch stolen keystores." },
 };
+
+export type AttackGlyphName = "badge" | "dice" | "key" | "eye" | "link" | "ear" | "loop" | "recycle" | "swap" | "mask" | "lock" | "safe";
 
 export interface AttackCopy { label: string; code: string; oneLiner: string; glyph: AttackGlyphName }
 

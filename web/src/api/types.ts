@@ -237,3 +237,94 @@ export interface Incident {
 export interface OpsResult { label: string; alerts: number; incidents: Incident[]; reduction: number }
 
 export interface Participants { signers: string[]; verifiers: string[]; honeypots: number }
+
+export interface TeleportResult {
+  input_bloch: [number, number, number];
+  bsm_probabilities: Record<"00" | "01" | "10" | "11", number>;
+  bsm: "00" | "01" | "10" | "11";
+  correction: "I" | "X" | "Z" | "XZ";
+  received_bloch: [number, number, number];
+  output_bloch: [number, number, number];
+  fidelity: number;
+  error_rate: number;
+  basis: number | null;
+  six_state_error_rate: number;
+  qasm: string;
+}
+
+export interface BsmResult { shots: number; counts: Record<string, number>; chi2: number; p_value: number; uniform: boolean }
+
+export interface FarResult {
+  n: number; tau: number; noise: number; limit: number; trials: number; false_alarms: number;
+  far_empirical: number; far_exact: number; ci95: [number, number]; chernoff_bound: number; hoeffding_bound: number;
+  exact_inside_ci: boolean;
+}
+
+export interface AcceptanceCheck {
+  id: string; title: string; criterion: string; passed: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  evidence: Record<string, any>;
+}
+export interface Acceptance { generated_at: number; seconds: number; mode: string; passed: boolean; checks: AcceptanceCheck[] }
+
+export interface HoltSeries { level: number; trend: number; sigma: number; forecast: number[]; low: number[]; high: number[]; history: number[] }
+export interface LinkForecast {
+  link: string; status: string; points: number; risk: "unknown" | "low" | "watch" | "elevated" | "high";
+  steps_to_breach?: number | null; note?: string;
+  qber?: HoltSeries & { steps_to_alarm: number | null };
+  chsh?: HoltSeries & { steps_to_classical: number | null };
+}
+export interface ForecastResult { label: string; horizon: number; links: LinkForecast[] }
+
+export interface Anomaly { ledger_index: number; link: string; decision: Decision; ts: number; score: number; qber: number; drivers: string[] }
+export interface AnomalyResult { label: string; scored: number; anomalies: Anomaly[]; note?: string }
+
+export interface CopilotStatus { label: string; mode: "claude" | "offline"; model: string }
+
+// --- fraud review: the AI advises (ops plane), the analyst decides (kernel ledger) ---------------
+export type Disposition = "confirm_fraud" | "escalate" | "monitor" | "dismiss";
+export type RiskLevel = "low" | "medium" | "high" | "critical";
+
+export interface Review {
+  index: number;
+  timestamp: number;
+  entry_hash: string;
+  verdict_index?: number;
+  verdict_decision?: Decision;
+  decision: Disposition;
+  note: string;
+  reviewer: string;
+  agreed_with_ai: boolean | null;
+  advisory?: { risk: number; level: RiskLevel; category: string; recommendation: Disposition; label: string } | null;
+}
+
+export interface FraudCase {
+  label: string;
+  ledger_index: number;
+  ts: number;
+  decision: Decision;
+  link: string;
+  signer_id: string;
+  verifier_id: string;
+  key_id: string;
+  risk: number;
+  level: RiskLevel;
+  category: string;
+  reasons: string[];
+  detectors: string[];
+  recommendation: Disposition;
+  recommendation_text: string;
+  containment: string[];
+  confidence: "low" | "medium" | "high";
+  review: Pick<Review, "index" | "timestamp" | "decision" | "note" | "reviewer" | "agreed_with_ai" | "entry_hash"> | null;
+}
+
+export interface FraudQueue {
+  label: string;
+  scanned: number;
+  flagged: number;
+  open: number;
+  by_level: Record<"critical" | "high" | "medium", number>;
+  agreement: number | null;
+  cases: FraudCase[];
+}

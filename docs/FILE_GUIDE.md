@@ -5,12 +5,12 @@ Every file in the repository, grouped by folder, in plain language. For *how* th
 ## How the pieces connect
 
 ```
- Browser: web/  (React dashboard, "Trust Console")
-    │  REST + WebSocket (/ws/telemetry)                       │ REST (/incidents)
+ Browser: web/  (React dashboard, "Trust Console", 3-D)
+    │  REST + WebSocket (/ws/telemetry)                       │ REST + SSE (/fraud, /copilot, /forecast…)
     ▼                                                         ▼
  qsentinel/api/main.py  (FastAPI, port 8000)          ops/qsentinel_ops/server.py (port 8100)
-    │                                                         ▲   advisory AI: reads telemetry only,
-    ▼                                                         │   never writes anything back
+    │   ▲ POST /reviews/{i}: the ANALYST's fraud decision     ▲   advisory AI: reads telemetry only,
+    ▼   │ (signed onto the ledger with the AI's advice)       │   never writes anything back
  qsentinel/pipeline.py  ── sign → teleport → verify → detect → ledger → telemetry ──┘
     │            │                 │                 │
     ▼            ▼                 ▼                 ▼
@@ -30,7 +30,8 @@ The decision is made in `detect/` and nowhere else. Everything above it only rea
 | change what an alarm checks | `qsentinel/detect/d1_…` to `d6_…` |
 | add an attack | `qsentinel/attacks/library.py` (+ `campaigns/smoke.yaml`) |
 | add an API endpoint | `qsentinel/api/main.py` (+ `web/src/api/client.ts` + `types.ts`) |
-| change a dashboard page | `web/src/pages/<Page>.tsx` |
+| change a dashboard page | `web/src/pages/console/<Page>.tsx` (landing: `web/src/pages/Landing.tsx`) |
+| change how the AI scores fraud | `ops/qsentinel_ops/fraud.py` |
 | change how alerts are named ("Probe in Z basis"…) | `web/src/lib/attribution.ts` |
 | change what gets written to the blockchain | `qsentinel/pipeline.py` → `ledger.append(...)` |
 | run everything | README → "Quick start", or `docker compose up --build` |
@@ -139,63 +140,61 @@ The decision is made in `detect/` and nowhere else. Everything above it only rea
 | File | What it does |
 |---|---|
 | `__init__.py` | Package marker |
-| `main.py` | FastAPI app on port 8000. **Status:** `/health`, `/overview`, `/participants`. **Sign/verify:** `/sign`, `/verify`, `/verdicts`, `/verdicts/{i}`. **Red team:** `/attacks`, `/attacks/run`, `/sweeps`. **Ledger:** `/ledger`, `/ledger/verify`, `/ledger/audit`, `/ledger/anchor`, `/ledger/proof/{i}`. **Channels:** `/links`, `/calibration`. **Live:** `/telemetry`, `/ws/telemetry`. Also API-key role-based access control |
+| `main.py` | FastAPI app on port 8000. **Status:** `/health`, `/overview`, `/participants`. **Sign/verify:** `/sign`, `/verify`, `/verdicts`, `/verdicts/{i}`. **Red team:** `/attacks`, `/attacks/run`, `/sweeps`. **Ledger:** `/ledger`, `/ledger/verify`, `/ledger/audit`, `/ledger/anchor`, `/ledger/proof/{i}`. **Channels:** `/links`, `/calibration`, `/calibration/far`. **Quantum lab:** `/quantum/teleport`, `/quantum/bsm`. **Fraud decisions (human):** `/reviews`, `/reviews/{i}`. **Report:** `/report/acceptance`. **Live:** `/telemetry`, `/ws/telemetry`. Also API-key role-based access control |
 
 ## `ops/`: the advisory AI service (separate package; can't touch decisions)
 | File | What it does |
 |---|---|
-| `pyproject.toml` | Its own dependencies (scikit-learn, FastAPI). Deliberately does **not** depend on `qsentinel` |
+| `pyproject.toml` | Its own dependencies (scikit-learn, FastAPI; `[llm]` adds the Anthropic SDK). Deliberately does **not** depend on `qsentinel` |
 | `README.md` | What the ops plane is and how to run it |
 | `qsentinel_ops/__init__.py` | The `ADVISORY - NOT A TRUST DECISION` label every output carries |
 | `qsentinel_ops/clustering.py` | Groups alert storms into incidents (DBSCAN) from the API's telemetry |
-| `qsentinel_ops/narration.py` | Plain-English incident summaries (deterministic template; LLM phrasing planned) |
-| `qsentinel_ops/server.py` | Small FastAPI service on port 8100: `/incidents`, `/health`. Used by the dashboard's Ops page |
+| `qsentinel_ops/narration.py` | Plain-English incident summaries (deterministic template) |
+| `qsentinel_ops/anomaly.py` | Ranks the least typical verifications (Isolation Forest) with the features that drove the score |
+| `qsentinel_ops/forecast.py` | Per-link QBER / CHSH projection (Holt smoothing) and verifications-to-threshold |
+| `qsentinel_ops/fraud.py` | Fraud review queue: risk score 0-100, category, reasons and a *recommended* disposition per verification. The analyst decides |
+| `qsentinel_ops/copilot.py` | Sentinel Copilot: Claude (`ANTHROPIC_API_KEY`) or an offline analyst, answering from a read-only situation brief |
+| `qsentinel_ops/server.py` | FastAPI service on port 8100: `/incidents`, `/forecast`, `/anomalies`, `/fraud/queue`, `/fraud/cases/{i}`, `/copilot/*`, `/health` |
 
 ## `web/`: the dashboard ("Trust Console")
-Visual language: an illustrated, retro-futurist "Bureau of Quantum Signatures" (hand-inked machinery, brass
-plates, amber phosphor, film grain) around a clean data layer. The browser only observes: every
-ACCEPT/REJECT shown comes from the backend.
+Visual language: "Quantum Observatory" - light pearl / deep-field dark themes, glass cards, React Three
+Fiber scenes (hero, protocol story, network, Bloch sphere, ledger chain, risk orb), Lenis smooth
+scrolling and Framer Motion. The browser only observes: every ACCEPT/REJECT shown comes from the backend,
+and fraud decisions are made by the person using it.
 
 | File | What it does |
 |---|---|
 | `package.json` / `package-lock.json` | Dependencies and scripts (`npm run dev`, `npm run build`) |
 | `vite.config.ts` | Build tool config (port 5173, `@/` alias); splits big libraries (Three.js, charts, motion) into cached files |
-| `tailwind.config.js` / `postcss.config.js` | Tailwind theme: ink/paper/amber palette, fonts, animations |
-| `tsconfig.json` | TypeScript settings (strict mode) |
-| `index.html` | The single HTML page (loads the Google Fonts) |
-| `src/main.tsx` | Starts React with the data-fetching client and the router |
-| `src/App.tsx` | Layout (backdrop, top bar, index, toasts, Presenter Mode) and the page routes; pages load on first visit |
-| `src/index.css` | Tailwind layers plus the panel, plate, button, chip, slider, grain and print styles |
-| `src/api/types.ts` | TypeScript shapes of every API response |
-| `src/api/client.ts` | All calls to the API and the ops service; API key handling (sessionStorage only); serves recorded data in replay mode |
-| `src/api/hooks.ts` | Shared TanStack Query hooks (health, overview, links, audit, attacks, verdicts) |
-| `src/state/telemetry.ts` | Live event store, WebSocket connection (auto-reconnect), incident toasts, replay player |
-| `src/state/session.ts` | Session recorder: save a live demo as JSON; replay it with no backend, including POST actions in recorded order |
-| `src/state/ui.ts` | Presenter Mode (open, scene, timer) and the mobile menu |
-| `src/lib/attribution.ts` | Fixed rules that turn alarms into a label like "Probe in Z basis (stealth)" (§8), plus the plain-English copy deck. Presentation only, not ML |
-| `src/lib/physics.ts` | Display maths: exact ellipsoid axes and shape names, CHSH, fidelity, exact/Chernoff odds for the calculator |
-| `src/lib/format.ts` | Scientific notation, percentages, time and docket formatting |
-| `src/lib/merkle.ts` | In-browser SHA3 Merkle proof check (same construction as the backend) |
-| `src/lib/events.ts` | Helpers to pick verdict events out of the live feed |
-| `src/components/art/` | Illustrations: cipher wheel, cipher-machine-to-qubit hero, vacuum tube, lamps, stamp, oscilloscope, toggle, attack medallions, animated backdrop, shared SVG filters |
-| `src/components/shell/` | Top bar (health, live lamp, DEV MODE, "AI in trust path: NO", record, Presenter Mode), side index, incident toasts, shared primitives, error boundary |
-| `src/components/verdict/` | Proof-certificate pieces: banner with stamp, detector cards, block heatmap, CHSH gauge, fingerprint panel, Bell bars, Merkle ladder, QR/export, punch-card hash, alert feed, attack field guide |
-| `src/components/channel/` | 3-D armillary ellipsoid (axis = 1 − 2 × error rate, baseline ghost), 2-D porthole thumbnail, strip charts and sparklines |
-| `src/components/attack/` | Attack catalogue card, information-vs-disturbance meter, run result |
-| `src/components/ops/AdvisoryFrame.tsx` | The hatched "Advisory - not a trust decision" frame around all ops-plane output |
-| `src/demo/script.ts` | The 7-scene guided demo (runs real attacks, then moves between pages) |
-| `src/demo/PresenterMode.tsx` | Clapperboard bar with timer and keyboard controls; runs offline from a recorded session |
-| `src/pages/MissionControl.tsx` | Home: situation board with attack class, KPIs, quick-demo levers, link health, Bell meter, field guide, live feed |
-| `src/pages/Journey.tsx` | One signature animated through eight stations across all layers |
-| `src/pages/AttackLab.tsx` | Launch any attack (with arming lever), sweeps, and the 17-scenario campaign |
-| `src/pages/VerdictInspector.tsx` | The full proof certificate for any verdict |
-| `src/pages/ChannelObservatory.tsx` | Baseline vs now, 3-D ellipsoid, exact semi-axes, Pauli fingerprint, probes, charts |
-| `src/pages/LedgerExplorer.tsx` | The chain, anchors, Merkle proofs with QR, and the auditor |
-| `src/pages/Transferability.tsx` | Cheating signer vs the commit-reveal shuffle |
-| `src/pages/Bounds.tsx` | Interactive "how safe are we?" calculator and calibration table |
-| `src/pages/OpsPlane.tsx` | Advisory incidents, fenced off; STIX 2.1 export of rejected verdicts |
-| `src/pages/Settings.tsx` | API key, endpoints, offline replay |
-| `src/pages/Report.tsx` | Printable security report (`/report`) assembled from existing endpoints |
+| `tailwind.config.js` / `postcss.config.js` | Theme tokens (CSS variables), fonts, animations |
+| `index.html` | The single HTML page (fonts, theme applied before first paint) |
+| `src/main.tsx` / `src/App.tsx` | React root (query client, router, smooth scroll, click sparks) and the routes: `/` landing, `/console/*` console |
+| `src/index.css` | Theme tokens (light/dark), cards, buttons, chips, fields, BorderGlow and print styles |
+| `src/api/` | `types.ts` (every response shape), `client.ts` (all calls to the kernel and the ops service; API key in sessionStorage; replay), `hooks.ts` (shared TanStack Query hooks) |
+| `src/state/` | `telemetry.ts` (WebSocket feed, toasts, replay), `session.ts` (record / replay a demo), `ui.ts` (theme, copilot drawer, Presenter Mode) |
+| `src/lib/` | `attribution.ts` (fixed rules naming the attack class), `physics.ts` (display maths), `format.ts`, `merkle.ts` (in-browser SHA3 proof check), `events.ts`, `cn.ts` |
+| `src/three/` | 3-D scenes: `HeroScene` (landing), `StoryScene` (scroll-driven protocol), `QuantumNetwork` (live links), `BlochSphere` (teleportation + channel ellipsoid), `LedgerChain` (the chain), `RiskOrb` (fraud risk), `common.tsx` (sleeping canvas, theme palette, labels) |
+| `src/fx/` | Motion toolkit: reveals, split text, count-up, tilt cards, magnetic buttons, Aurora, BorderGlow, AnimatedList, ClickSpark, Lenis smooth scroll |
+| `src/components/shell/` | Console layout, sidebar (with open-case badges), top bar, toasts, logo, error boundary, `nav.ts` |
+| `src/components/ui/` | Design-system primitives: card, chip, stat, slider, toggle, tabs, meter, empty/error states |
+| `src/components/verdict/` | Proof-certificate pieces (banner, detector cards, heatmap, fingerprint, Bell bars, Merkle ladder, QR export), CHSH gauge, alert feed, field guide |
+| `src/components/copilot/` | Sentinel Copilot chat (streams from the ops service) and its slide-over drawer |
+| `src/components/charts/` | Recharts wrappers in the theme colours, sparkline |
+| `src/demo/` | The 7-step Presenter Mode script and its control bar (works offline from a recording) |
+| `src/pages/Landing.tsx` | Public landing: 3-D hero, scroll-driven 3-D story, detectors, "AI advises, you decide", live numbers |
+| `src/pages/console/MissionControl.tsx` | Live 3-D network, incident card, Bell meter, KPIs, quick actions, link health, live feed, forecast strip |
+| `src/pages/console/AttackLab.tsx` | Launch any attack, sweeps, and the 17-scenario campaign |
+| `src/pages/console/Verdicts.tsx` | The full proof certificate for any verdict, with the AI's fraud hint |
+| `src/pages/console/Channels.tsx` | 3-D channel ellipsoid vs baseline, semi-axes, fingerprint, QBER/CHSH/CUSUM charts, send-through-a-channel probe |
+| `src/pages/console/TeleportLab.tsx` | Exact state-vector teleportation on a 3-D Bloch sphere, BSM statistics, OpenQASM export |
+| `src/pages/console/Ledger.tsx` | 3-D chain, entries (verdicts, anchors, analyst reviews), chain verify, anchor, auditor |
+| `src/pages/console/Journey.tsx` | Sign your own message, then watch it through eight stations on a 3-D stage |
+| `src/pages/console/Transferability.tsx` | Cheating signer vs the commit-reveal shuffle, with evidence sweeps |
+| `src/pages/console/Bounds.tsx` | Forgery-odds calculator, calibration table, 100k-trial false-alarm check |
+| `src/pages/console/FraudReview.tsx` | Fraud queue: AI risk, reasons and suggestion; the analyst picks the disposition and signs it onto the ledger |
+| `src/pages/console/Ops.tsx` | Copilot, incidents, forecasts, unusual verifications, fraud queue summary, trust boundary |
+| `src/pages/console/Report.tsx` | D1-D6 acceptance (re-runnable) and a printable security report incl. analyst decisions |
+| `src/pages/console/Settings.tsx` | API key, endpoints and service status, offline replay, theme |
 
 ## `deploy/`: containers
 | File | What it does |
@@ -204,6 +203,8 @@ ACCEPT/REJECT shown comes from the backend.
 | `Dockerfile.ops` | Advisory ops image (the only image with scikit-learn) |
 | `Dockerfile.web` | Builds the dashboard, then serves it with nginx |
 | `nginx.conf` | Serves the dashboard; page refreshes on deep links work; long-cache for assets |
+| `../Dockerfile`, `start.sh`, `nginx.single.conf.template` | The all-in-one public image: nginx + kernel + advisory AI in separate venvs on one `$PORT` (`/api`, `/ops`) |
+| `../render.yaml` | One-click Render blueprint for that image |
 
 ## `tests/`: automatic checks (`pytest`)
 | File | What it proves |
@@ -216,9 +217,11 @@ ACCEPT/REJECT shown comes from the backend.
 | `test_calibrate.py` | Security numbers, exact ≤ Chernoff, simulator agreement, SPRT speed |
 | `test_pqc.py` | ML-DSA implementations interoperate; hybrid KEM; tunnel rejects tamper/replay/MITM |
 | `test_ledger.py` | Tamper detection, Merkle proofs, anchoring, restart-safe replay protection, disputes, commit-reveal |
-| `test_api.py` | Endpoints end-to-end, including verdict store, overview, sweeps, probes and access control |
+| `test_api.py` | Endpoints end-to-end, including verdict store, overview, sweeps, probes, analyst reviews and access control |
 | `test_telemetry.py` | Event bus and the Redis mirror (with a fake Redis) |
-| `test_ops.py` | Advisory clustering and narration service |
+| `test_ops.py` | Advisory clustering, forecasts, anomalies, copilot and the fraud queue (and that the analyst's decision never changes a verdict) |
+| `test_statevector.py` | Exact teleportation engine agrees with Stim |
+| `test_acceptance.py` | The D1-D6 acceptance report passes on this build |
 | `test_no_ml_in_trust_path.py` | No AI library is imported by or loaded into the decision code |
 
 ## `docs/`: guides
@@ -237,5 +240,6 @@ ACCEPT/REJECT shown comes from the backend.
 | File | What it's for |
 |---|---|
 | `chain/README.md`, `chain/chaincode/` | Plan and placeholder for the Hyperledger Fabric network (Phase 3) |
-| `notebooks/README.md` | Planned Jupyter notebooks for the security report |
+| `notebooks/` | Threshold calibration notebook (`01_calibration.ipynb`) |
+| `Q-SENTINEL_D1-D6/` | Anansh Jain's stand-alone D1-D6 reference implementation, kept as delivered. Its criteria also run against the integrated system: `python -m qsentinel.acceptance` |
 | `scripts/github_setup.sh` | One-time script to create the repo, invite teammates and add starter issues |

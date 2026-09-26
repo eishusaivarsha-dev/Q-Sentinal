@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-llm = ["anthropic>=0.40"]
+llm = ["anthropic>=1.8"]      # beta Messages API with server-side fallbacks
 forecast = ["prophet>=1.1"]
 
 [tool.setuptools.packages.find]

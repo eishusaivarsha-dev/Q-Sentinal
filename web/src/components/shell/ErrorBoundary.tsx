@@ -1,16 +1,18 @@
-import { Component, type ReactNode } from 'react';
+import { Component, type ReactNode } from "react";
 
-export class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+/** Keeps one broken page (or a WebGL failure) from blanking the whole console. */
+export default class ErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
-  static getDerivedStateFromError(error: Error) { return { error }; }
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
   render() {
     if (!this.state.error) return this.props.children;
-    return (
-      <div className="panel mx-auto max-w-xl p-8 text-center">
-        <div className="eyebrow mb-2 !text-reject">Machine fault</div>
-        <h2 className="font-display text-[28px] text-paper">This drawer jammed.</h2>
-        <p className="data mt-3 break-all text-[12px] text-paper-faint">{this.state.error.message}</p>
-        <button className="btn-ghost mt-5" onClick={() => this.setState({ error: null })}>Try again</button>
+    return this.props.fallback ?? (
+      <div className="card p-8">
+        <p className="text-[18px] font-bold text-bad">This view hit an error.</p>
+        <p className="data mt-2 text-[14px] text-ink-3">{this.state.error.message}</p>
+        <button className="btn-ghost mt-4" onClick={() => this.setState({ error: null })}>Try again</button>
       </div>
     );
   }

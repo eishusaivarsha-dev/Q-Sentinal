@@ -1,23 +1,21 @@
 import type { AttackInfo } from "@/api/types";
 import { attackCopy, attacksForClass, DETECTOR_IDS } from "@/lib/attribution";
+import { cn } from "@/lib/cn";
 
 /**
  * Field guide: which detectors the backend declares for each attack (GET /attacks). Rows matching
- * the current incident's class are lit and the detectors that actually fired are underlined, so an
- * analyst can name the attack at a glance.
+ * the current incident's class are lit and the detectors that actually fired are marked.
  */
-export function SignatureMatrix({ attacks, classLabel, fired }: { attacks: AttackInfo[]; classLabel?: string; fired: Set<string> }) {
+export default function SignatureMatrix({ attacks, classLabel, fired }: { attacks: AttackInfo[]; classLabel?: string; fired: Set<string> }) {
   const hot = new Set(classLabel ? attacksForClass(classLabel) : []);
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[420px] border-separate border-spacing-0 text-[11.5px]">
+    <div className="overflow-x-auto" data-lenis-prevent>
+      <table className="w-full min-w-[480px] border-separate border-spacing-0 text-[14px]">
         <thead>
           <tr>
-            <th className="label py-1.5 pr-2 text-left font-normal">Attack</th>
+            <th className="label pb-2 pr-3 text-left !text-[12px]">Attack</th>
             {DETECTOR_IDS.map((d) => (
-              <th key={d} className={`data w-10 py-1.5 text-center font-normal ${fired.has(d) ? "text-reject" : "text-paper-faint"}`}>
-                {d}{fired.has(d) && <div className="mx-auto mt-0.5 h-[2px] w-5 bg-reject" />}
-              </th>
+              <th key={d} className={cn("data w-12 pb-2 text-center text-[13px] font-semibold", fired.has(d) ? "text-bad" : "text-ink-3")}>{d}</th>
             ))}
           </tr>
         </thead>
@@ -26,15 +24,15 @@ export function SignatureMatrix({ attacks, classLabel, fired }: { attacks: Attac
             const on = hot.has(a.name);
             const copy = attackCopy(a.name);
             return (
-              <tr key={a.name} className={on ? "bg-reject/15" : ""}>
-                <td className={`border-t border-amber/10 py-1.5 pr-2 ${on ? "text-reject" : "text-paper-dim"}`} title={copy.oneLiner}>
-                  <span className="data mr-2 text-[10px] text-paper-mute">{copy.code}</span>{copy.label}{on && " ◀"}
+              <tr key={a.name} className={cn("transition-colors", on && "bg-bad/8")}>
+                <td className={cn("border-t border-line py-2 pr-3", on ? "font-semibold text-bad" : "text-ink-2")} title={copy.oneLiner}>
+                  <span className="data mr-2 text-[12px] text-ink-3">{copy.code}</span>{copy.label}
                 </td>
                 {DETECTOR_IDS.map((d) => (
-                  <td key={d} className="border-t border-amber/10 text-center">
+                  <td key={d} className="border-t border-line text-center">
                     {a.detectors.includes(d)
-                      ? <span className={`inline-block h-2.5 w-2.5 rounded-full ${on ? "bg-reject shadow-[0_0_8px_#e0513a]" : "bg-amber/60"}`} />
-                      : <span className="text-paper-mute">·</span>}
+                      ? <span className={cn("inline-block h-3 w-3 rounded-full", on ? "bg-bad shadow-[0_0_10px_rgb(var(--bad))]" : "bg-brand/60")} />
+                      : <span className="text-line-2">·</span>}
                   </td>
                 ))}
               </tr>

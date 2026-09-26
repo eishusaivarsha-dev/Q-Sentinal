@@ -1,40 +1,46 @@
 /** @type {import('tailwindcss').Config} */
+// Colours are CSS variables (src/index.css) so the light and dark themes swap without re-rendering.
+const v = (name) => `rgb(var(--${name}) / <alpha-value>)`;
+
 export default {
   content: { relative: true, files: ['./index.html', './src/**/*.{ts,tsx}'] },
   theme: {
     extend: {
       colors: {
-        ink: { DEFAULT: '#0c0a07', 900: '#0c0a07', 800: '#14110c', 700: '#1c1811', 600: '#27211779', 500: '#3a3123' },
-        paper: { DEFAULT: '#e9dcc0', dim: '#bfae8c', faint: '#8a7c62', mute: '#5f5442' },
-        amber: { DEFAULT: '#f0a53a', hot: '#ffc15e', deep: '#c4761c', glow: '#ffd28a' },
-        rust: { DEFAULT: '#c8502a', deep: '#8e3219' },
-        verdigris: { DEFAULT: '#7fb8a4', deep: '#3f7a6a' },
-        accept: '#a9c46c',
-        reject: '#e0513a',
-        photon: '#fff1c9',
+        bg: { DEFAULT: v('bg'), 2: v('bg-2') },
+        surface: { DEFAULT: v('surface'), 2: v('surface-2') },
+        line: { DEFAULT: v('line'), 2: v('line-2') },
+        ink: { DEFAULT: v('ink'), 2: v('ink-2'), 3: v('ink-3') },
+        brand: { DEFAULT: v('brand'), 2: v('brand-2') },
+        violet: v('violet'),
+        ok: v('ok'),
+        warn: v('warn'),
+        bad: v('bad'),
       },
       fontFamily: {
-        display: ['"DM Serif Display"', 'Georgia', 'serif'],
-        label: ['"Oswald"', '"Arial Narrow"', 'sans-serif'],
-        mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
-        type: ['"Special Elite"', '"Courier New"', 'monospace'],
+        sans: ['Manrope', 'ui-sans-serif', 'system-ui', 'Segoe UI', 'sans-serif'],
+        serif: ['"Instrument Serif"', 'Georgia', 'serif'],
+        mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
+      borderRadius: { xl2: '20px', xl3: '28px' },
       boxShadow: {
-        panel: 'inset 0 0 0 1px rgba(240,165,58,.14), inset 0 1px 0 rgba(255,210,138,.06), 0 10px 30px -12px rgba(0,0,0,.8)',
-        glow: '0 0 24px -4px rgba(240,165,58,.55)',
+        card: '0 1px 2px rgb(var(--shadow) / .05), 0 16px 36px -22px rgb(var(--shadow) / .35)',
+        lift: '0 2px 4px rgb(var(--shadow) / .06), 0 30px 60px -30px rgb(var(--brand) / .45)',
+        glow: '0 0 0 1px rgb(var(--brand) / .35), 0 10px 40px -10px rgb(var(--brand) / .55)',
       },
       keyframes: {
-        flicker: { '0%,100%': { opacity: '1' }, '47%': { opacity: '.86' }, '50%': { opacity: '.6' }, '53%': { opacity: '.92' } },
+        shimmer: { from: { backgroundPosition: '200% 0' }, to: { backgroundPosition: '-200% 0' } },
+        float: { '0%,100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-8px)' } },
+        pulseRing: { '0%': { transform: 'scale(.8)', opacity: '.8' }, '100%': { transform: 'scale(2.4)', opacity: '0' } },
+        marquee: { from: { transform: 'translateX(0)' }, to: { transform: 'translateX(-50%)' } },
         spinSlow: { to: { transform: 'rotate(360deg)' } },
-        slideIn: { from: { transform: 'translateX(110%)', opacity: '0' }, to: { transform: 'none', opacity: '1' } },
-        stamp: { '0%': { transform: 'scale(2.2) rotate(-14deg)', opacity: '0' }, '60%': { transform: 'scale(.94) rotate(-7deg)', opacity: '1' }, '100%': { transform: 'scale(1) rotate(-7deg)', opacity: '1' } },
       },
       animation: {
-        flicker: 'flicker 4s infinite',
-        'spin-slow': 'spinSlow 40s linear infinite',
-        'spin-slower': 'spinSlow 90s linear infinite reverse',
-        slideIn: 'slideIn .35s cubic-bezier(.2,.9,.3,1.2)',
-        stamp: 'stamp .45s cubic-bezier(.2,.9,.3,1.3) forwards',
+        shimmer: 'shimmer 2.4s linear infinite',
+        float: 'float 6s ease-in-out infinite',
+        'pulse-ring': 'pulseRing 1.8s cubic-bezier(.2,.6,.3,1) infinite',
+        marquee: 'marquee 40s linear infinite',
+        'spin-slow': 'spinSlow 30s linear infinite',
       },
     },
   },

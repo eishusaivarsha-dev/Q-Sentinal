@@ -1,0 +1,22 @@
+# Render blueprint: the public demo (all-in-one image from the root Dockerfile).
+#   Render dashboard -> New -> Blueprint -> pick this repository -> Apply.
+# One service, one URL: dashboard at /, trust kernel at /api (docs: /api/docs), advisory AI at /ops.
+# The free plan sleeps when idle; the first request after a nap takes ~30-60 s to wake it.
+services:
+  - type: web
+    name: q-sentinel
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: QSENTINEL_PROFILE
+        value: fast
+      - key: QSENTINEL_DEMO_SEED
+        value: "1"
+      # Optional: set in the Render dashboard to let the copilot answer with Claude
+      # (without it, the offline analyst answers). Never commit the key.
+      - key: ANTHROPIC_API_KEY
+        sync: false

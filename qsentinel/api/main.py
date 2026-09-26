@@ -20,21 +20,26 @@ from __future__ import annotations
 import asyncio
 import hmac
 import os
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import Literal
 
 import numpy as np
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from .. import acceptance
 from ..attacks import ATTACKS, run_attack
 from ..attacks.sweep import sweep
 from ..config import FAST, Settings
 from ..detect.calibrate import tradeoff_table
+from ..detect.validate import false_alarm_validation
 from ..ledger import audit, find_disputes
 from ..pipeline import QSentinel
 from ..qds import Signature
 from ..quantum import ChannelModel
+from ..quantum import statevector as sv
 
 PROFILE = os.getenv("QSENTINEL_PROFILE", "fast")
 SETTINGS = FAST if PROFILE == "fast" else Settings()
@@ -44,7 +49,30 @@ env.register_verifier("bob")
 env.register_verifier("charlie")
 
 DEFAULT_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173"
-app = FastAPI(title="Q-SENTINEL API", version="0.3.0",
+
+
+def seed_demo() -> None:
+    """QSENTINEL_DEMO_SEED=1 (the public demo image): start with a short, realistic history so the
+    console is not empty for the first visitor - honest traffic on two links, a few attacks, and
+    one Merkle anchor. Everything goes through the normal pipeline and ledger."""
+    for i in range(4):
+        for verifier in ("bob", "charlie"):
+            env.verify(env.sign("alice", f"Settlement batch #{1040 + i}".encode()), verifier)
+    for attack, strength in (("stealth_probe", None), ("blind_forgery", None), ("replay", None),
+                             ("intercept_resend", 0.5), ("stolen_key_honeypot", None)):
+        run_attack(env, attack, strength, seed=int.from_bytes(os.urandom(4)))
+        env.verify(env.sign("alice", b"Routine clearance"), "bob")
+    env.ledger.anchor(force=True)
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    if os.getenv("QSENTINEL_DEMO_SEED") == "1" and not env.ledger.entries[1:]:
+        await asyncio.to_thread(seed_demo)
+    yield
+
+
+app = FastAPI(title="Q-SENTINEL API", version="0.4.0", lifespan=lifespan,
               description="AI-free quantum threat detection for teleportation-based QDS")
 app.add_middleware(CORSMiddleware, allow_origins=os.getenv("CORS_ORIGINS", DEFAULT_ORIGINS).split(","),
                    allow_methods=["*"], allow_headers=["*"])
@@ -142,6 +170,35 @@ class SweepIn(BaseModel):
     noise: float = Field(0.0, ge=0, le=0.2)
     full: bool = False
     seed: int = 0
+
+
+class TeleportIn(BaseModel):
+    state: str | None = Field(None, description="one of 0, 1, +, -, +i, -i; or null to use theta/phi")
+    theta: float = Field(0.0, ge=0, le=3.1416)
+    phi: float = Field(0.0, ge=-6.2832, le=6.2832)
+    channel: ChannelIn = ChannelIn()
+    seed: int | None = None
+
+
+class BsmIn(BaseModel):
+    shots: int = Field(4096, ge=16, le=1_000_000)
+    channel: ChannelIn = ChannelIn()
+    seed: int | None = None
+
+
+class AdvisorySnapshot(BaseModel):
+    """What the advisory AI recommended when the analyst decided (stored for the audit trail only)."""
+    risk: int = Field(..., ge=0, le=100)
+    level: str = Field(..., max_length=16)
+    category: str = Field(..., max_length=80)
+    recommendation: Literal["confirm_fraud", "escalate", "monitor", "dismiss"]
+
+
+class ReviewIn(BaseModel):
+    decision: Literal["confirm_fraud", "escalate", "monitor", "dismiss"]
+    note: str = Field("", max_length=600)
+    reviewer: str = Field("analyst", min_length=1, max_length=40)
+    advisory: AdvisorySnapshot | None = None
 
 
 # --- status --------------------------------------------------------------------------------
@@ -325,6 +382,47 @@ def ledger_proof(index: int):
     return {**proof, "valid": env.ledger.check_proof(proof)}
 
 
+# --- analyst fraud reviews (the human's decision, on the ledger) ----------------------------
+# The advisory AI (ops/) scores cases and recommends a disposition; the analyst decides. The
+# decision is chained and ML-DSA signed like a verdict, so it is non-repudiable. It never changes
+# the verdict itself: ACCEPT/REJECT stays the detectors' call.
+ADVISORY_LABEL = "ADVISORY - NOT A TRUST DECISION"
+
+
+def _reviews() -> list[dict]:
+    return [{"index": e.index, "timestamp": e.timestamp, "entry_hash": e.entry_hash, **e.payload}
+            for e in env.ledger.by_kind("analyst_review")]
+
+
+@app.post("/reviews/{ledger_index}")
+def add_review(ledger_index: int, body: ReviewIn, p: Principal = Depends(require("analyst"))):
+    v = env.verdict(ledger_index)
+    if v is None:
+        raise HTTPException(404, "no verdict stored at that ledger index")
+    reviewer = body.reviewer if p.dev or "admin" in p.roles else p.name
+    payload = {
+        "verdict_index": ledger_index,
+        "verdict_decision": v["decision"],
+        "link": v["certificate"]["link"],
+        "signer_id": v["certificate"]["signature"]["signer_id"],
+        "decision": body.decision,
+        "note": body.note.strip(),
+        "reviewer": reviewer,
+        "advisory": None if body.advisory is None else {**body.advisory.model_dump(), "label": ADVISORY_LABEL},
+        "agreed_with_ai": None if body.advisory is None else body.advisory.recommendation == body.decision,
+    }
+    entry = env.ledger.append("analyst_review", payload)
+    return {"index": entry.index, "timestamp": entry.timestamp, "entry_hash": entry.entry_hash, **payload}
+
+
+@app.get("/reviews", dependencies=[Depends(require("analyst"))])
+def list_reviews(verdict_index: int | None = None):
+    rows = _reviews()
+    if verdict_index is not None:
+        rows = [r for r in rows if r["verdict_index"] == verdict_index]
+    return rows
+
+
 # --- channels, calibration, telemetry ------------------------------------------------------
 @app.get("/links", dependencies=[Depends(require("analyst"))])
 def links(history: int = Query(100, ge=0, le=200)):
@@ -340,6 +438,44 @@ def links(history: int = Query(100, ge=0, le=200)):
 @app.get("/calibration")
 def calibration(target: float = 1e-16):
     return tradeoff_table(target)
+
+
+@app.get("/calibration/far")
+def calibration_far(n: int = Query(64, ge=8, le=1024), tau: float = Query(0.10, ge=0, le=0.5),
+                    noise: float = Query(0.04, ge=0, le=0.5), trials: int = Query(100_000, ge=1000, le=200_000)):
+    """Honest-block false-alarm rate: 100k Monte-Carlo trials vs the exact tail and the bounds."""
+    return false_alarm_validation(n, tau, noise, trials)
+
+
+# --- quantum lab (exact state-vector engine; display and education, never a verdict) ----------
+@app.post("/quantum/teleport")
+def quantum_teleport(body: TeleportIn):
+    if body.state is not None and body.state not in sv.EIGENSTATES:
+        raise HTTPException(422, f"state must be one of {sorted(sv.EIGENSTATES)}")
+    psi = sv.EIGENSTATES[body.state] if body.state else sv.state_from_bloch(body.theta, body.phi)
+    ch = body.channel.model()
+    trace = sv.teleport(psi, ch, np.random.default_rng(body.seed))
+    theta = body.theta if body.state is None else float(np.arccos(np.clip(trace.input_bloch[2], -1, 1)))
+    phi = body.phi if body.state is None else float(np.arctan2(trace.input_bloch[1], trace.input_bloch[0]))
+    return {**trace.to_dict(), "six_state_error_rate": sv.six_state_error_rate(ch), "qasm": sv.qasm(theta, phi)}
+
+
+@app.post("/quantum/bsm")
+def quantum_bsm(body: BsmIn):
+    return sv.bsm_counts(body.shots, body.channel.model(), body.seed)
+
+
+# --- acceptance report (D1-D6 criteria run against this build) --------------------------------
+_ACCEPTANCE: dict = {}
+
+
+@app.get("/report/acceptance")
+def report_acceptance(refresh: bool = False):
+    """Runs on a throw-away system (never the live ledger); cached until ?refresh=true."""
+    if refresh or not _ACCEPTANCE:
+        _ACCEPTANCE.clear()
+        _ACCEPTANCE.update(acceptance.run())
+    return _ACCEPTANCE
 
 
 @app.get("/telemetry", dependencies=[Depends(require("analyst"))])

@@ -4,6 +4,7 @@
 import type { NavigateFunction } from "react-router-dom";
 import { api } from "@/api/client";
 import { pct } from "@/lib/format";
+import { to } from "@/components/shell/nav";
 
 export interface DemoStep { title: string; caption: string; seconds: number; run: (nav: NavigateFunction) => Promise<string> }
 
@@ -17,7 +18,7 @@ export const SCRIPT: DemoStep[] = [
     caption: "Alice signs; Bob measures every coin in the revealed direction. Honest signatures verify with certainty.",
     run: async (nav) => {
       const r = await api.runAttack({ attack: "honest" });
-      nav(`/journey/${r.verdict.certificate.ledger_index}`);
+      nav(to(`journey/${r.verdict.certificate.ledger_index}`));
       return `${r.decision}: ${r.verdict.certificate.transcript.total_rounds.toLocaleString()} coins, ${r.verdict.certificate.alerts.length} alarms.`;
     },
   },
@@ -27,7 +28,7 @@ export const SCRIPT: DemoStep[] = [
     caption: "A forger doesn't know the directions, so she guesses. Physics punishes guessing exponentially.",
     run: async (nav) => {
       const r = await api.runAttack({ attack: "blind_forgery" });
-      nav(`/verdicts/${r.verdict.certificate.ledger_index}`);
+      nav(to(`verdicts/${r.verdict.certificate.ledger_index}`));
       return `${r.decision} by ${r.fired}. Look at the red heatmap and the 10⁻¹⁶ bound.`;
     },
   },
@@ -41,7 +42,7 @@ export const SCRIPT: DemoStep[] = [
         const r = await api.runAttack({ attack: "intercept_resend", strength: s });
         out.push(`${pct(s, 0)}: QBER ${pct(d4(r)?.qber)}, ${r.decision}`);
       }
-      nav("/channels");
+      nav(to("channels"));
       return out.join(" · ");
     },
   },
@@ -51,7 +52,7 @@ export const SCRIPT: DemoStep[] = [
     caption: "Eve listens to only a few percent, in one direction. The error rate stays under the 11% alarm, but the fingerprint names her: the ellipsoid becomes a Z-cigar.",
     run: async (nav) => {
       const r = await api.runAttack({ attack: "stealth_probe" });
-      nav("/channels");
+      nav(to("channels"));
       const fp = d4(r)?.fingerprint;
       return `${r.decision} + warning. QBER ${pct(d4(r)?.qber)} · ${fp?.label} · estimated ${pct(fp?.est_intercept_fraction)} (true ${pct(r.strength, 0)}).`;
     },
@@ -63,7 +64,7 @@ export const SCRIPT: DemoStep[] = [
     run: async (nav) => {
       const rep = await api.runAttack({ attack: "replay" });
       const st = await api.runAttack({ attack: "stolen_key_honeypot" });
-      nav(`/verdicts/${st.verdict.certificate.ledger_index}`);
+      nav(to(`verdicts/${st.verdict.certificate.ledger_index}`));
       return `Replay: ${rep.decision} by ${rep.fired}. Stolen key: ${st.decision} by ${st.fired} (D2 found nothing wrong — physics alone can't catch this).`;
     },
   },
@@ -74,7 +75,7 @@ export const SCRIPT: DemoStep[] = [
     run: async (nav) => {
       const off = await api.runAttack({ attack: "repudiation_unprotected" });
       const on = await api.runAttack({ attack: "repudiation" });
-      nav("/transferability");
+      nav(to("transferability"));
       return `Without shuffle: Bob ${off.metrics.bob}, Charlie ${off.metrics.charlie} → dispute on the ledger. With shuffle: Bob ${on.metrics.bob}, Charlie ${on.metrics.charlie} → consistent.`;
     },
   },
@@ -85,7 +86,7 @@ export const SCRIPT: DemoStep[] = [
     run: async (nav) => {
       await api.anchor();
       const v = await api.ledgerVerify();
-      nav("/ledger");
+      nav(to("ledger"));
       return `${v.detail}. Open any verdict and press “Verify in browser”, or scan its QR code.`;
     },
   },

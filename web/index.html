@@ -1,14 +1,24 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0c0a07" />
-    <title>Q-SENTINEL Trust Console</title>
+    <meta name="theme-color" content="#f0f3f8" />
+    <title>Q-SENTINEL · Quantum-safe signatures, proven by physics</title>
+    <meta name="description" content="Q-SENTINEL verifies quantum digital signatures with six AI-free detectors, a post-quantum ledger and an advisory AI copilot. Smart India Hackathon 2026." />
+    <meta property="og:title" content="Q-SENTINEL" />
+    <meta property="og:description" content="Quantum-safe digital signatures with an AI-free threat detector." />
     <link rel="icon" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&family=Oswald:wght@400;500;600&family=Special+Elite&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <script>
+      // Apply the saved theme before first paint (no flash). Storage can be blocked: default light.
+      try {
+        var t = localStorage.getItem("qs-theme");
+        if (t === "dark" || t === "light") document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

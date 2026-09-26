@@ -1,50 +1,46 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { VerdictEvent } from "@/lib/events";
 import { classOfEvent } from "@/lib/attribution";
+import { cn } from "@/lib/cn";
+import type { VerdictEvent } from "@/lib/events";
 import { clock } from "@/lib/format";
-import { ClassChip, DecisionBadge, DetectorChip, Empty } from "../shell/primitives";
+import AnimatedList from "@/fx/AnimatedList";
+import { to } from "../shell/nav";
+import { ClassChip, DecisionBadge, DetectorChip, Empty, Tabs } from "../ui";
 
-/** Teleprinter tape of verdict events (newest first). Each row opens its proof certificate. */
-export function AlertFeed({ events, disputed, limit = 30 }: { events: VerdictEvent[]; disputed?: Set<string>; limit?: number }) {
+/** Live verdict feed (newest first) built on React Bits' AnimatedList. Each row opens its proof. */
+export default function AlertFeed({ events, disputed, limit = 40, maxHeight = 520 }: { events: VerdictEvent[]; disputed?: Set<string>; limit?: number; maxHeight?: number }) {
   const navigate = useNavigate();
-  const [onlyIncidents, setOnly] = useState(false);
-  const rows = (onlyIncidents ? events.filter((e) => e.data.decision === "REJECT" || e.data.alerts.length) : events).slice(0, limit);
+  const [mode, setMode] = useState<"all" | "alerts">("all");
+  const rows = (mode === "alerts" ? events.filter((e) => e.data.decision === "REJECT" || e.data.alerts.some((a) => a.alert && a.severity !== "info")) : events).slice(0, limit);
   return (
     <div>
-      <div className="mb-3 flex items-center gap-2">
-        {(["All traffic", "Alerts only"] as const).map((l, i) => (
-          <button key={l} onClick={() => setOnly(!!i)} className={`chip ${onlyIncidents === !!i ? "border-amber text-amber" : "border-paper-mute/40 text-paper-faint hover:text-paper"}`}>{l}</button>
-        ))}
-      </div>
-      {rows.length === 0 ? <Empty>Tape is quiet. Run a signature from the quick-demo levers.</Empty> : (
-        <ol className="divide-y divide-amber/10">
-          {rows.map((e) => {
+      <div className="mb-4"><Tabs value={mode} onChange={setMode} options={[["all", "All traffic"], ["alerts", "Alerts only"]]} /></div>
+      {rows.length === 0 ? <Empty>Quiet so far. Run a quick action above and watch verdicts stream in.</Empty> : (
+        <AnimatedList items={rows} maxHeight={maxHeight} itemKey={(e) => e.seq} onSelect={(e) => navigate(to(`verdicts/${e.data.ledger_index}`))}
+          render={(e, selected) => {
             const cls = classOfEvent(e.data, disputed);
-            const top = e.data.alerts.find((a) => a.severity === "critical") ?? e.data.alerts[0];
+            const fired = e.data.alerts.filter((a) => a.alert && a.severity !== "info");
+            const top = fired.find((a) => a.severity === "critical") ?? fired[0];
             return (
-              <li key={e.seq}>
-                <button onClick={() => navigate(`/verdicts/${e.data.ledger_index}`)}
-                  className={`group grid w-full grid-cols-[auto_1fr] items-start gap-x-3 px-2 py-2.5 text-left transition hover:bg-amber/[.04] ${e.data.decision === "REJECT" ? "bg-reject/[.05]" : ""}`}>
-                  <span className="flex flex-col items-start gap-1">
-                    <span className="data text-[11px] text-paper-faint">{clock(e.ts)}</span>
+              <div className={cn("rounded-2xl border p-3.5 transition-all duration-300",
+                selected ? "border-brand/40 bg-brand/5 shadow-[0_12px_30px_-20px_rgb(var(--brand))]" : "border-line bg-surface-2/70",
+                e.data.decision === "REJECT" && !selected && "border-bad/25")}>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
                     <DecisionBadge decision={e.data.decision} />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="flex flex-wrap items-center gap-1.5">
-                      <ClassChip cls={cls} />
-                      {e.data.alerts.map((a) => <DetectorChip key={a.detector} id={a.detector} severity={a.severity} />)}
-                    </span>
-                    <span className="mt-1 block truncate text-[11px] text-paper-dim group-hover:text-paper">
-                      <span className="data text-paper-faint">#{e.data.ledger_index} · {e.data.link}{e.data.transferred ? " (forwarded)" : ""}</span>
-                      {top && <> · {top.detector}: {top.detail}</>}
-                    </span>
-                  </span>
-                </button>
-              </li>
+                    <ClassChip cls={cls} />
+                  </div>
+                  <span className="data shrink-0 text-[12.5px] text-ink-3">{clock(e.ts)}</span>
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <span className="data text-[13px] text-ink-2">#{e.data.ledger_index} · {e.data.link}{e.data.transferred ? " (forwarded)" : ""}</span>
+                  {fired.map((a) => <DetectorChip key={a.detector} id={a.detector} severity={a.severity} />)}
+                </div>
+                {top && <p className="mt-1.5 line-clamp-1 text-[13.5px] text-ink-3">{top.detector}: {top.detail}</p>}
+              </div>
             );
-          })}
-        </ol>
+          }} />
       )}
     </div>
   );

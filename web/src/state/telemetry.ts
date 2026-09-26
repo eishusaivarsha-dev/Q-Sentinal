@@ -1,7 +1,7 @@
 // Live telemetry store (one-way feed from the trust kernel) + WebSocket connection + toasts.
 import { useEffect } from "react";
 import { create } from "zustand";
-import { API_URL, getApiKey } from "@/api/client";
+import { getApiKey, wsUrl } from "@/api/client";
 import type { TelemetryEvent, VerdictEventData } from "@/api/types";
 import { classOfEvent, type AttackClass } from "@/lib/attribution";
 import { useSession, type SessionFile } from "./session";
@@ -74,7 +74,7 @@ export function useTelemetryConnection() {
       setStatus("connecting");
       const key = getApiKey();
       // The backend requires the key as ?key= on the socket; this is the only URL it enters.
-      ws = new WebSocket(`${API_URL.replace(/^http/, "ws")}/ws/telemetry?since=${lastSeq}${key ? `&key=${encodeURIComponent(key)}` : ""}`);
+      ws = new WebSocket(wsUrl(`/ws/telemetry?since=${lastSeq}${key ? `&key=${encodeURIComponent(key)}` : ""}`));
       ws.onopen = () => useTelemetry.getState().setStatus("live");
       ws.onmessage = (m) => {
         let e: TelemetryEvent;

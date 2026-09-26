@@ -13,6 +13,10 @@ export const useVerdictSummaries = (limit = 100) =>
   useQuery({ queryKey: ["verdicts", limit], queryFn: () => api.verdicts(limit), refetchInterval: 3000 });
 export const useVerdict = (index: number | undefined) =>
   useQuery({ queryKey: ["verdict", index], queryFn: () => api.verdict(index as number), enabled: index !== undefined && !Number.isNaN(index) });
+export const useLedger = (limit = 80) => useQuery({ queryKey: ["ledger", limit], queryFn: () => api.ledger(limit), refetchInterval: 3000 });
+export const useFraudQueue = (minRisk = 25, openOnly = false) =>
+  useQuery({ queryKey: ["fraud-queue", minRisk, openOnly], queryFn: () => api.fraudQueue(minRisk, openOnly), refetchInterval: 6000, retry: false });
+export const useCopilotStatus = () => useQuery({ queryKey: ["copilot-status"], queryFn: api.copilotStatus, retry: false, staleTime: 60_000 });
 
 /** Key IDs the ledger auditor flagged as transferability disputes (for the §8 chip rule 1). */
 export function useDisputedKeys(): Set<string> {
