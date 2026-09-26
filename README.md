@@ -6,7 +6,7 @@
 > Quantum physics decides accept/reject. Every verdict is a closed-form statistical rule with a proven error bound, and **no AI/ML is in the trust path** (CI enforces this).
 > An advisory AI watches for fraud, explains what it sees and suggests what to do, **but the analyst makes the final call**, and that decision is signed onto the ledger next to the AI's advice.
 
-**Live demo:** _see "Deploy" below_ · run it yourself in one command: `docker build -t q-sentinel . && docker run -p 7860:7860 q-sentinel` → http://localhost:7860
+**Live demo:** https://q-sentinel-5g81.onrender.com (free tier: the first visit after idle takes ~1 min to wake) · run it yourself in one command: `docker build -t q-sentinel . && docker run -p 7860:7860 q-sentinel` → http://localhost:7860
 
 ## Quick start
 
