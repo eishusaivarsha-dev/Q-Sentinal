@@ -1,134 +1,105 @@
-// Presenter Mode (docs/frontend-spec.md §9): the < 6-minute guided demo. Each step calls the real
-// API, then navigates to the page that shows the result. Record it (top bar) for an offline copy.
+// Presenter Mode (docs/frontend-spec.md §9): a clapperboard bar that drives the 7-step demo.
+// Keys: ← → scenes · Space/Enter runs the scene · Esc exits.
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
-import { useNavigate, type NavigateFunction } from "react-router-dom";
-import { api, errorText } from "../api/client";
-import { pct } from "../lib/physics";
-import { useSession } from "../state/session";
-import { useUi } from "../state/ui";
+import { AnimatePresence, motion } from "framer-motion";
+import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { errorText } from "@/api/client";
+import { useSession } from "@/state/session";
+import { useUi } from "@/state/ui";
+import { SCRIPT, SCRIPT_BUDGET } from "./script";
 
-interface Step { title: string; caption: string; run: (nav: NavigateFunction) => Promise<string> }
-
-const d4 = (r: Awaited<ReturnType<typeof api.runAttack>>) => r.verdict.results.find((x) => x.detector === "D4")?.extra;
-
-const STEPS: Step[] = [
-  {
-    title: "1. An honest signature",
-    caption: "Alice signs; Bob measures every coin in the revealed direction. Honest signatures verify with certainty.",
-    run: async (nav) => {
-      const r = await api.runAttack({ attack: "honest" });
-      nav(`/journey/${r.verdict.certificate.ledger_index}`);
-      return `${r.decision}: ${r.verdict.certificate.transcript.total_rounds.toLocaleString()} coins, ${r.verdict.certificate.alerts.length} alarms.`;
-    },
-  },
-  {
-    title: "2. A forger guesses",
-    caption: "A forger doesn't know the directions, so she guesses. Physics punishes guessing exponentially.",
-    run: async (nav) => {
-      const r = await api.runAttack({ attack: "blind_forgery" });
-      nav(`/verdicts/${r.verdict.certificate.ledger_index}`);
-      return `${r.decision} by ${r.fired}. Look at the red heatmap.`;
-    },
-  },
-  {
-    title: "3. An eavesdropper, getting bolder",
-    caption: "Eve listens to 10%, then 30%, then every qubit. The error rate climbs, entanglement collapses, the sphere shrinks.",
-    run: async (nav) => {
-      const out: string[] = [];
-      for (const s of [0.1, 0.3, 1]) {
-        const r = await api.runAttack({ attack: "intercept_resend", strength: s });
-        out.push(`${pct(s, 0)}: QBER ${pct(d4(r)?.qber)}, ${r.decision}`);
-      }
-      nav("/channels");
-      return out.join(" · ") + ". Encrypt the 2 correction bits and Eve learns nothing (see the Attack Lab info meter).";
-    },
-  },
-  {
-    title: "4. A stealth probe",
-    caption: "Eve listens to only a few percent, in one direction. The error rate stays under the 11% alarm, but the fingerprint names her.",
-    run: async (nav) => {
-      const r = await api.runAttack({ attack: "stealth_probe" });
-      nav("/channels");
-      const fp = d4(r)?.fingerprint;
-      return `${r.decision} + warning. QBER ${pct(d4(r)?.qber)} · ${fp?.label} · estimated ${pct(fp?.est_intercept_fraction)} (true ${pct(r.strength, 0)}).`;
-    },
-  },
-  {
-    title: "5. Replay, then a stolen key store",
-    caption: "Replays can only resend old classical data (no-cloning), so D5 catches them. A thief with the real keys makes a valid signature – but hits a honeypot.",
-    run: async (nav) => {
-      const rep = await api.runAttack({ attack: "replay" });
-      const st = await api.runAttack({ attack: "stolen_key_honeypot" });
-      nav(`/verdicts/${st.verdict.certificate.ledger_index}`);
-      return `Replay: ${rep.decision} by ${rep.fired}. Stolen key: ${st.decision} by ${st.fired} (D2 found nothing wrong – physics alone can't catch this).`;
-    },
-  },
-  {
-    title: "6. A signer who wants to cheat",
-    caption: "Alice sends Bob good coins and Charlie damaged ones. Without protection the verifiers split; with the commit-reveal shuffle they can't be split.",
-    run: async (nav) => {
-      const off = await api.runAttack({ attack: "repudiation_unprotected" });
-      const on = await api.runAttack({ attack: "repudiation" });
-      nav("/ledger");
-      return `Without shuffle: Bob ${off.metrics.bob}, Charlie ${off.metrics.charlie} → dispute on the ledger. With shuffle: Bob ${on.metrics.bob}, Charlie ${on.metrics.charlie} → consistent.`;
-    },
-  },
-  {
-    title: "7. The proof",
-    caption: "Every verdict is chained, signed with ML-DSA and anchored under a Merkle root. AI in trust path: NO. Here is the proof.",
-    run: async (nav) => {
-      await api.anchor();
-      const v = await api.ledgerVerify();
-      nav("/ledger");
-      return `${v.detail}. Open any verdict and press “Verify in browser”, or scan its QR code.`;
-    },
-  },
-];
+const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
 export default function PresenterMode() {
+  const { presenter, step, startedAt, goStep, closePresenter } = useUi();
+  const replay = useSession((s) => s.replay);
   const nav = useNavigate();
   const qc = useQueryClient();
-  const close = useUi((s) => s.setPresenter);
-  const replay = useSession((s) => s.replay);
-  const [i, setI] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<string>("");
-  const [started] = useState(Date.now());
-  const [now, setNow] = useState(Date.now());
+  const [result, setResult] = useState("");
+  const [elapsed, setElapsed] = useState(0);
+  const s = SCRIPT[step];
+
   useEffect(() => {
-    const t = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(t);
-  }, []);
-  const step = STEPS[i];
-  const go = async () => {
+    if (!presenter || !startedAt) return;
+    const i = setInterval(() => setElapsed((Date.now() - startedAt) / 1000), 250);
+    return () => clearInterval(i);
+  }, [presenter, startedAt]);
+
+  useEffect(() => setResult(""), [step]);
+
+  const run = useCallback(async () => {
+    if (busy) return;
     setBusy(true);
     setResult("");
     try {
-      setResult(await step.run(nav));
+      setResult(await SCRIPT[useUi.getState().step].run(nav));
     } catch (e) {
       setResult(`Error: ${errorText(e)}`);
     } finally {
       setBusy(false);
       qc.invalidateQueries();
     }
-  };
-  const secs = Math.floor((now - started) / 1000);
+  }, [busy, nav, qc]);
+
+  useEffect(() => {
+    if (!presenter) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t?.closest?.("input,select,textarea,button")) return;
+      const cur = useUi.getState().step;
+      if (e.key === "ArrowRight" || e.key === "PageDown") goStep(Math.min(SCRIPT.length - 1, cur + 1));
+      else if (e.key === "ArrowLeft" || e.key === "PageUp") goStep(Math.max(0, cur - 1));
+      else if (e.key === " " || e.key === "Enter") { e.preventDefault(); void run(); }
+      else if (e.key === "Escape") closePresenter();
+    };
+    addEventListener("keydown", onKey);
+    return () => removeEventListener("keydown", onKey);
+  }, [presenter, goStep, closePresenter, run]);
+
+  const over = elapsed > SCRIPT_BUDGET;
+
   return (
-    <div className="fixed inset-x-4 bottom-4 z-40 rounded-2xl border-2 border-cyan-500 bg-slate-950/95 p-5 shadow-2xl md:left-64">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs uppercase tracking-widest text-cyan-300">Presenter Mode · step {i + 1} of {STEPS.length} · {Math.floor(secs / 60)}:{String(secs % 60).padStart(2, "0")}</p>
-        <button className="text-sm text-slate-400 hover:text-white" onClick={() => close(false)}>Close ×</button>
-      </div>
-      <h2 className="mt-1 text-2xl font-semibold">{step.title}</h2>
-      <p className="mt-1 text-lg text-slate-300">{step.caption}</p>
-      {result && <p className="mt-2 rounded-lg bg-slate-900 p-2 text-sm text-cyan-100">{result}</p>}
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button className="rounded-lg border border-slate-700 px-3 py-2 text-sm disabled:opacity-40" disabled={i === 0 || busy} onClick={() => { setI(i - 1); setResult(""); }}>← Back</button>
-        <button className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold disabled:opacity-40" disabled={busy || replay} onClick={go}>{busy ? "Running…" : "Run this step"}</button>
-        <button className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold disabled:opacity-40" disabled={i === STEPS.length - 1 || busy} onClick={() => { setI(i + 1); setResult(""); }}>Next →</button>
-        {replay && <span className="self-center text-xs text-amber-300">Replay mode is read-only – browse the recorded pages instead.</span>}
-      </div>
-    </div>
+    <AnimatePresence>
+      {presenter && (
+        <motion.div initial={{ y: 220 }} animate={{ y: 0 }} exit={{ y: 240 }} transition={{ type: "spring", stiffness: 160, damping: 20 }}
+          className="no-print fixed inset-x-2 bottom-2 z-[80] md:inset-x-6 md:bottom-4 lg:left-[270px]">
+          <div className="panel overflow-hidden !bg-ink/95" style={{ boxShadow: "inset 0 0 0 1px rgba(240,165,58,.5), 0 30px 60px -10px #000" }}>
+            <div className="h-3 w-full" style={{ background: "repeating-linear-gradient(120deg,#e9dcc0 0 18px,#0c0a07 18px 36px)" }} />
+            <div className="grid gap-4 p-4 md:grid-cols-[auto_1fr_auto] md:items-center md:px-6">
+              <div className="flex items-center gap-4">
+                <div className="text-center">
+                  <div className="label">Scene</div>
+                  <div className="font-display text-[40px] leading-none text-amber">{step + 1}<span className="text-[18px] text-paper-faint">/{SCRIPT.length}</span></div>
+                </div>
+                <div className="text-center">
+                  <div className="label">Reel</div>
+                  <div className={`data text-[20px] ${over ? "text-reject" : "phosphor"}`}>{mmss(elapsed)}</div>
+                  <div className="data text-[10px] text-paper-faint">of {mmss(SCRIPT_BUDGET)}</div>
+                </div>
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-baseline gap-3"><h2 className="font-display text-[24px] text-paper">{s.title}</h2><span className="data text-[11px] text-paper-faint">~{s.seconds}s</span></div>
+                <p className="mt-1 text-[13px] leading-snug text-paper-dim">{s.caption}</p>
+                {result && <p className={`mt-2 rounded-md border hair bg-ink/70 p-2 text-[12px] ${result.startsWith("Error") ? "text-reject" : "text-amber-hot"}`}>{result}</p>}
+                <div className="mt-2 flex gap-1">{SCRIPT.map((_, i) => (
+                  <button key={i} onClick={() => goStep(i)} aria-label={`Scene ${i + 1}`} className={`h-1.5 flex-1 rounded-full ${i < step ? "bg-amber/60" : i === step ? "bg-amber" : "bg-ink-500"}`} />
+                ))}</div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button className="btn-danger" disabled={busy} onClick={run}>{busy ? "Transmitting…" : "⚡ Run scene"}</button>
+                <button className="btn-ghost" onClick={() => goStep(Math.max(0, step - 1))} disabled={step === 0 || busy}>←</button>
+                <button className="btn-primary" disabled={busy} onClick={() => (step === SCRIPT.length - 1 ? closePresenter() : goStep(step + 1))}>{step === SCRIPT.length - 1 ? "Finish" : "Next →"}</button>
+                <button className="btn-ghost !px-2.5" onClick={closePresenter} aria-label="Exit presenter">✕</button>
+              </div>
+            </div>
+            <div className="border-t hair px-6 py-1.5 font-type text-[10.5px] text-paper-mute">
+              ← → scenes · Space runs the scene · Esc exits{replay ? " · answering from the recorded session (offline)" : ""}
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

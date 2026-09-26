@@ -152,41 +152,50 @@ The decision is made in `detect/` and nowhere else. Everything above it only rea
 | `qsentinel_ops/server.py` | Small FastAPI service on port 8100: `/incidents`, `/health`. Used by the dashboard's Ops page |
 
 ## `web/`: the dashboard ("Trust Console")
+Visual language: an illustrated, retro-futurist "Bureau of Quantum Signatures" (hand-inked machinery, brass
+plates, amber phosphor, film grain) around a clean data layer. The browser only observes: every
+ACCEPT/REJECT shown comes from the backend.
+
 | File | What it does |
 |---|---|
 | `package.json` / `package-lock.json` | Dependencies and scripts (`npm run dev`, `npm run build`) |
-| `vite.config.ts` | Build tool config; splits big libraries (Three.js, charts) into separate cached files |
+| `vite.config.ts` | Build tool config (port 5173, `@/` alias); splits big libraries (Three.js, charts, motion) into cached files |
+| `tailwind.config.js` / `postcss.config.js` | Tailwind theme: ink/paper/amber palette, fonts, animations |
 | `tsconfig.json` | TypeScript settings (strict mode) |
-| `index.html` | The single HTML page |
+| `index.html` | The single HTML page (loads the Google Fonts) |
 | `src/main.tsx` | Starts React with the data-fetching client and the router |
-| `src/App.tsx` | The page routes; pages load on first visit |
-| `src/index.css` | Tailwind CSS |
+| `src/App.tsx` | Layout (backdrop, top bar, index, toasts, Presenter Mode) and the page routes; pages load on first visit |
+| `src/index.css` | Tailwind layers plus the panel, plate, button, chip, slider, grain and print styles |
 | `src/api/types.ts` | TypeScript shapes of every API response |
-| `src/api/client.ts` | All calls to the API and the ops service; API key handling; serves recorded data in replay mode |
-| `src/state/telemetry.ts` | Live event store, WebSocket connection (auto-reconnect), REJECT pop-ups, replay player |
-| `src/state/session.ts` | Session recorder: save a live demo as JSON, replay it with no backend |
-| `src/state/ui.ts` | Presenter Mode on/off |
-| `src/lib/attribution.ts` | Fixed rules that turn alarms into a label like "Probe in Z basis (stealth)". Presentation only, not ML |
-| `src/lib/physics.ts` | Display maths: ellipsoid axes, CHSH, exact/Chernoff odds for the calculator, number formatting |
+| `src/api/client.ts` | All calls to the API and the ops service; API key handling (sessionStorage only); serves recorded data in replay mode |
+| `src/api/hooks.ts` | Shared TanStack Query hooks (health, overview, links, audit, attacks, verdicts) |
+| `src/state/telemetry.ts` | Live event store, WebSocket connection (auto-reconnect), incident toasts, replay player |
+| `src/state/session.ts` | Session recorder: save a live demo as JSON; replay it with no backend, including POST actions in recorded order |
+| `src/state/ui.ts` | Presenter Mode (open, scene, timer) and the mobile menu |
+| `src/lib/attribution.ts` | Fixed rules that turn alarms into a label like "Probe in Z basis (stealth)" (§8), plus the plain-English copy deck. Presentation only, not ML |
+| `src/lib/physics.ts` | Display maths: exact ellipsoid axes and shape names, CHSH, fidelity, exact/Chernoff odds for the calculator |
+| `src/lib/format.ts` | Scientific notation, percentages, time and docket formatting |
 | `src/lib/merkle.ts` | In-browser SHA3 Merkle proof check (same construction as the backend) |
 | `src/lib/events.ts` | Helpers to pick verdict events out of the live feed |
-| `src/components/Layout.tsx` | Top bar (health, live dot, "AI in trust path: NO", record, Presenter Mode), side menu, pop-ups |
-| `src/components/ui.tsx` | Shared building blocks: cards, pills, stats, sliders, gauges, the hatched advisory frame |
-| `src/components/ChannelEllipsoid.tsx` | 3-D sphere that squashes into an ellipsoid when Eve probes (axis = 1 − 2 × error rate) |
-| `src/components/EllipseThumb.tsx` | Small 2-D version for link cards |
-| `src/components/SeriesChart.tsx` | Line charts and sparklines with threshold lines |
-| `src/components/VerdictParts.tsx` | Proof-certificate pieces: detector cards, block heatmap, CHSH gauge, fingerprint panel, Bell bars, Merkle ladder, QR/export, info meter |
-| `src/demo/PresenterMode.tsx` | The 7-step guided demo that runs real attacks and moves between pages |
-| `src/pages/MissionControl.tsx` | Home: KPIs, link health, quick-demo buttons, live alert feed |
-| `src/pages/Journey.tsx` | One signature animated through all layers |
-| `src/pages/AttackLab.tsx` | Launch any attack, sweeps, and the 17-scenario campaign |
+| `src/components/art/` | Illustrations: cipher wheel, cipher-machine-to-qubit hero, vacuum tube, lamps, stamp, oscilloscope, toggle, attack medallions, animated backdrop, shared SVG filters |
+| `src/components/shell/` | Top bar (health, live lamp, DEV MODE, "AI in trust path: NO", record, Presenter Mode), side index, incident toasts, shared primitives, error boundary |
+| `src/components/verdict/` | Proof-certificate pieces: banner with stamp, detector cards, block heatmap, CHSH gauge, fingerprint panel, Bell bars, Merkle ladder, QR/export, punch-card hash, alert feed, attack field guide |
+| `src/components/channel/` | 3-D armillary ellipsoid (axis = 1 − 2 × error rate, baseline ghost), 2-D porthole thumbnail, strip charts and sparklines |
+| `src/components/attack/` | Attack catalogue card, information-vs-disturbance meter, run result |
+| `src/components/ops/AdvisoryFrame.tsx` | The hatched "Advisory - not a trust decision" frame around all ops-plane output |
+| `src/demo/script.ts` | The 7-scene guided demo (runs real attacks, then moves between pages) |
+| `src/demo/PresenterMode.tsx` | Clapperboard bar with timer and keyboard controls; runs offline from a recorded session |
+| `src/pages/MissionControl.tsx` | Home: situation board with attack class, KPIs, quick-demo levers, link health, Bell meter, field guide, live feed |
+| `src/pages/Journey.tsx` | One signature animated through eight stations across all layers |
+| `src/pages/AttackLab.tsx` | Launch any attack (with arming lever), sweeps, and the 17-scenario campaign |
 | `src/pages/VerdictInspector.tsx` | The full proof certificate for any verdict |
-| `src/pages/Channels.tsx` | Channel Observatory: baseline vs now, 3-D ellipsoid, probes, charts |
-| `src/pages/LedgerExplorer.tsx` | The chain, anchors, Merkle proofs and the auditor |
+| `src/pages/ChannelObservatory.tsx` | Baseline vs now, 3-D ellipsoid, exact semi-axes, Pauli fingerprint, probes, charts |
+| `src/pages/LedgerExplorer.tsx` | The chain, anchors, Merkle proofs with QR, and the auditor |
 | `src/pages/Transferability.tsx` | Cheating signer vs the commit-reveal shuffle |
-| `src/pages/Bounds.tsx` | Interactive "how safe are we?" calculator |
-| `src/pages/OpsPlane.tsx` | Advisory AI incidents, fenced off |
+| `src/pages/Bounds.tsx` | Interactive "how safe are we?" calculator and calibration table |
+| `src/pages/OpsPlane.tsx` | Advisory incidents, fenced off; STIX 2.1 export of rejected verdicts |
 | `src/pages/Settings.tsx` | API key, endpoints, offline replay |
+| `src/pages/Report.tsx` | Printable security report (`/report`) assembled from existing endpoints |
 
 ## `deploy/`: containers
 | File | What it does |

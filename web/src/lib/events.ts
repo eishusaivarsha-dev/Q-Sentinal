@@ -1,4 +1,4 @@
-import type { TelemetryEvent, VerdictEventData } from "../api/types";
+import type { TelemetryEvent, VerdictEventData } from "@/api/types";
 
 export type VerdictEvent = { seq: number; ts: number; kind: "verdict"; data: VerdictEventData };
 

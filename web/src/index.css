@@ -1,1 +1,146 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ink: #0c0a07;
+  --paper: #e9dcc0;
+  --amber: #f0a53a;
+  --amber-hot: #ffc15e;
+  --rust: #c8502a;
+  --verdigris: #7fb8a4;
+  --accept: #a9c46c;
+  --reject: #e0513a;
+  --photon: #fff1c9;
+  --line: rgba(240, 165, 58, 0.16);
+  --line-strong: rgba(240, 165, 58, 0.38);
+  color-scheme: dark;
+}
+
+html, body { background: var(--ink); color: var(--paper); }
+body {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+::selection { background: rgba(240, 165, 58, .35); color: #fff; }
+* { scrollbar-width: thin; scrollbar-color: #3a3123 transparent; }
+
+/* Film grain + vignette sit above the backdrop, below the UI. */
+.grain::after {
+  content: '';
+  position: fixed; inset: -50%;
+  pointer-events: none; z-index: 60;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 .9  0 0 0 0 .75  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  opacity: .075;
+  animation: grain 1.2s steps(6) infinite;
+  mix-blend-mode: overlay;
+}
+@keyframes grain {
+  0% { transform: translate(0, 0) } 20% { transform: translate(-3%, 2%) } 40% { transform: translate(2%, -4%) }
+  60% { transform: translate(-4%, -1%) } 80% { transform: translate(3%, 3%) } 100% { transform: translate(0, 0) }
+}
+.vignette { position: fixed; inset: 0; pointer-events: none; z-index: 1;
+  background: radial-gradient(ellipse at 50% 40%, transparent 30%, rgba(0,0,0,.55) 75%, rgba(0,0,0,.9) 100%); }
+
+@media (prefers-reduced-motion: reduce) {
+  .grain::after { animation: none; }
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}
+
+@layer components {
+  /* A machined panel: ink interior, amber hairline, riveted corners. Content stays clean. */
+  .panel {
+    @apply relative min-w-0 rounded-[10px] bg-ink-800/90 shadow-panel backdrop-blur-[2px];
+    background-image: linear-gradient(180deg, rgba(255,210,138,.035), transparent 40%);
+  }
+  .panel::before, .panel::after {
+    content: ''; position: absolute; width: 5px; height: 5px; border-radius: 9999px; top: 7px;
+    background: radial-gradient(circle at 35% 35%, #d9b27a, #6b4a22 70%);
+    box-shadow: 0 0 0 1px rgba(0,0,0,.6);
+  }
+  .panel::before { left: 7px; }
+  .panel::after { right: 7px; }
+
+  .panel-head {
+    @apply flex items-center justify-between gap-3 border-b px-5 py-2.5;
+    border-color: var(--line);
+  }
+  .panel-title { @apply font-label text-[11px] uppercase tracking-[.22em] text-amber; }
+  .panel-code { @apply font-mono text-[10px] tracking-widest text-paper-faint; }
+
+  .eyebrow { @apply font-label text-[11px] uppercase tracking-[.3em] text-amber/80; }
+  .label { @apply font-label text-[10px] uppercase tracking-[.2em] text-paper-faint; }
+  .data { @apply font-mono tabular-nums; }
+
+  /* Brass plate — used for system badges like "AI IN TRUST PATH: NO". */
+  .plate {
+    @apply inline-flex items-center gap-2 rounded-[4px] px-2.5 py-1 font-label text-[10.5px] uppercase tracking-[.18em];
+    color: #1a1208;
+    background: linear-gradient(180deg, #f3c877 0%, #d99a3b 45%, #b3761f 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.45), inset 0 -1px 0 rgba(0,0,0,.35), 0 0 0 1px #3b260c, 0 2px 6px rgba(0,0,0,.6);
+    text-shadow: 0 1px 0 rgba(255,235,190,.5);
+  }
+  .plate-dark {
+    @apply inline-flex items-center gap-2 rounded-[4px] border px-2.5 py-1 font-label text-[10.5px] uppercase tracking-[.18em] text-paper-dim;
+    border-color: var(--line-strong);
+    background: rgba(20,17,12,.85);
+  }
+
+  .btn {
+    @apply relative inline-flex select-none items-center justify-center gap-2 rounded-[6px] px-4 py-2 font-label text-[12px] uppercase tracking-[.2em] transition active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .btn-primary {
+    @apply btn text-ink;
+    background: linear-gradient(180deg, #ffc15e, #e08e27);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.5), inset 0 -2px 0 rgba(0,0,0,.25), 0 0 0 1px #4a2d0b, 0 6px 18px -6px rgba(240,165,58,.7);
+  }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .btn-danger {
+    @apply btn text-paper;
+    background: linear-gradient(180deg, #e0513a, #9b2f1c);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.3), inset 0 -2px 0 rgba(0,0,0,.3), 0 0 0 1px #3d120a, 0 6px 18px -6px rgba(224,81,58,.7);
+  }
+  .btn-ghost {
+    @apply btn border text-paper-dim hover:text-amber;
+    border-color: var(--line-strong);
+    background: rgba(12,10,7,.6);
+  }
+  .btn-ghost:hover { border-color: var(--amber); }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-[2px] font-label text-[10px] uppercase tracking-[.14em];
+  }
+
+  .field {
+    @apply w-full rounded-[6px] border bg-ink/80 px-3 py-2 font-mono text-[13px] text-paper outline-none transition placeholder:text-paper-mute focus:border-amber;
+    border-color: var(--line-strong);
+  }
+
+  .hair { border-color: var(--line); }
+  .rule { @apply h-px w-full; background: linear-gradient(90deg, transparent, var(--line-strong), transparent); }
+
+  .phosphor { color: var(--amber-hot); text-shadow: 0 0 8px rgba(255,193,94,.55), 0 0 22px rgba(240,165,58,.25); }
+  .scanlines { background-image: repeating-linear-gradient(0deg, rgba(0,0,0,.28) 0 1px, transparent 1px 3px); }
+  .blueprint {
+    background-color: #0f1512;
+    background-image:
+      linear-gradient(rgba(127,184,164,.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(127,184,164,.07) 1px, transparent 1px),
+      linear-gradient(rgba(127,184,164,.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(127,184,164,.035) 1px, transparent 1px);
+    background-size: 64px 64px, 64px 64px, 16px 16px, 16px 16px;
+  }
+}
+
+/* Range input as a brass slider */
+input[type='range'].slider { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 99px; background: linear-gradient(90deg, var(--amber) var(--p, 50%), #2a241a var(--p, 50%)); box-shadow: inset 0 1px 2px rgba(0,0,0,.8); }
+input[type='range'].slider::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff1c9, #d99a3b 55%, #6b4a22); box-shadow: 0 0 0 2px #1a1208, 0 2px 6px rgba(0,0,0,.7); cursor: grab; }
+input[type='range'].slider::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; border: 0; background: radial-gradient(circle at 35% 30%, #fff1c9, #d99a3b 55%, #6b4a22); box-shadow: 0 0 0 2px #1a1208; }
+
+@media print {
+  .no-print, .grain::after, .vignette { display: none !important; }
+  body, html { background: #fff !important; color: #111 !important; }
+  .print-sheet { background: #fbf6ea !important; color: #1a1208 !important; box-shadow: none !important; }
+}

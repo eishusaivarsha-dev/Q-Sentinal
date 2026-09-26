@@ -1,21 +1,26 @@
 // Live telemetry store (one-way feed from the trust kernel) + WebSocket connection + toasts.
 import { useEffect } from "react";
 import { create } from "zustand";
-import { API_URL, getApiKey } from "../api/client";
-import type { TelemetryEvent } from "../api/types";
-import { classOfEvent } from "../lib/attribution";
+import { API_URL, getApiKey } from "@/api/client";
+import type { TelemetryEvent, VerdictEventData } from "@/api/types";
+import { classOfEvent, type AttackClass } from "@/lib/attribution";
 import { useSession, type SessionFile } from "./session";
 
-export interface Toast { id: number; title: string; body: string; ledgerIndex?: number }
-type Status = "connecting" | "live" | "down" | "replay";
+export interface Toast {
+  id: number;
+  cls: AttackClass;
+  data: VerdictEventData;
+  critical: boolean;
+}
+export type LinkState = "connecting" | "live" | "down" | "replay";
 
 interface TelemetryState {
   events: TelemetryEvent[];
   lastSeq: number;
-  status: Status;
+  status: LinkState;
   toasts: Toast[];
   add(events: TelemetryEvent[]): void;
-  setStatus(s: Status): void;
+  setStatus(s: LinkState): void;
   reset(): void;
   dismiss(id: number): void;
 }
@@ -35,14 +40,11 @@ export const useTelemetry = create<TelemetryState>((set) => ({
       if (!fresh.length) return s;
       const toasts = [...s.toasts];
       for (const e of fresh) {
-        if (e.kind === "verdict" && e.data.decision === "REJECT" && e.ts > APP_START - 2) {
-          const top = e.data.alerts.find((a) => a.severity === "critical") ?? e.data.alerts[0];
-          toasts.push({
-            id: ++toastId,
-            title: `REJECT · ${classOfEvent(e.data).label}`,
-            body: `${e.data.link} · ${top ? `${top.detector}: ${top.detail}` : "signature rejected"}`,
-            ledgerIndex: e.data.ledger_index,
-          });
+        // Toast every REJECT, and every verdict carrying a critical alert (spec §3, §14).
+        if (e.kind !== "verdict" || e.ts < APP_START - 2) continue;
+        const critical = e.data.alerts.some((a) => a.severity === "critical");
+        if (e.data.decision === "REJECT" || critical) {
+          toasts.push({ id: ++toastId, cls: classOfEvent(e.data), data: e.data, critical });
         }
       }
       return {
@@ -60,7 +62,10 @@ export const useTelemetry = create<TelemetryState>((set) => ({
 export function useTelemetryConnection() {
   const replay = useSession((s) => s.replay);
   useEffect(() => {
-    if (replay) return;
+    if (replay) {
+      useTelemetry.getState().setStatus("replay");
+      return;
+    }
     let ws: WebSocket | null = null;
     let stopped = false;
     let timer: number | undefined;
@@ -68,16 +73,23 @@ export function useTelemetryConnection() {
       const { lastSeq, setStatus } = useTelemetry.getState();
       setStatus("connecting");
       const key = getApiKey();
+      // The backend requires the key as ?key= on the socket; this is the only URL it enters.
       ws = new WebSocket(`${API_URL.replace(/^http/, "ws")}/ws/telemetry?since=${lastSeq}${key ? `&key=${encodeURIComponent(key)}` : ""}`);
       ws.onopen = () => useTelemetry.getState().setStatus("live");
       ws.onmessage = (m) => {
-        const e = JSON.parse(m.data) as TelemetryEvent;
+        let e: TelemetryEvent;
+        try {
+          e = JSON.parse(m.data) as TelemetryEvent;
+        } catch {
+          return;
+        }
         useTelemetry.getState().add([e]);
         useSession.getState().recordEvent(e);
       };
       ws.onclose = () => {
+        if (stopped) return; // closed on purpose (e.g. entering replay): keep the new status
         useTelemetry.getState().setStatus("down");
-        if (!stopped) timer = window.setTimeout(open, 2000);
+        timer = window.setTimeout(open, 2000);
       };
     };
     open();
