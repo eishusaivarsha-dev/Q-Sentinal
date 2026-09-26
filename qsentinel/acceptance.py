@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -131,9 +132,14 @@ def d6_reproducibility(seed: int) -> dict:
 
 
 def trust_path_guard() -> dict:
-    loaded = sorted(m for m in sys.modules if m.split(".")[0] in ML_MODULES)
+    # A fresh interpreter that imports only the trust path: the calling process (pytest, the API
+    # server) may have unrelated libraries loaded, which says nothing about the kernel.
+    code = ("import sys, qsentinel.pipeline, qsentinel.detect, qsentinel.qds, qsentinel.quantum, qsentinel.ledger; "
+            f"print(','.join(sorted(m for m in sys.modules if m.split('.')[0] in {sorted(ML_MODULES)!r})))")
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=120)
+    loaded = [m for m in out.stdout.strip().split(",") if m] if out.returncode == 0 else [f"import failed: {out.stderr[-200:]}"]
     return _check("NFR-1", "No AI in the trust path", not loaded, {"ml_modules_loaded": loaded},
-                  "Running every check above loads no ML library")
+                  "Importing the whole trust path loads no ML library")
 
 
 def run(full: bool = False, seed: int = 2026) -> dict:
